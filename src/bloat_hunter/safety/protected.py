@@ -85,12 +85,14 @@ PROTECTED_INDICATORS: Set[str] = {
 }
 
 
-def is_protected_path(path: Path) -> bool:
+def is_protected_path(path: Path, for_scanning: bool = False) -> bool:
     """
     Check if a path is protected and should not be deleted.
 
     Args:
         path: Path to check
+        for_scanning: If True, only check if path should be skipped during scanning
+                      (system directories). If False, also check project roots.
 
     Returns:
         True if the path is protected
@@ -98,7 +100,7 @@ def is_protected_path(path: Path) -> bool:
     path_str = str(path.absolute())
     path_lower = path_str.lower()
 
-    # Check absolute protected paths
+    # Check absolute protected paths (always skip these)
     for protected in PROTECTED_PATTERNS:
         protected_lower = protected.lower()
         if path_lower == protected_lower or path_lower.startswith(protected_lower + os.sep):
@@ -106,16 +108,9 @@ def is_protected_path(path: Path) -> bool:
             if not _is_cache_subdirectory(path):
                 return True
 
-    # Check protected names
+    # Check protected names (always skip)
     if path.name in PROTECTED_NAMES:
         return True
-
-    # Check if this is a project root (contains project indicators)
-    for indicator in PROTECTED_INDICATORS:
-        if (path / indicator).exists():
-            # This is a project root - don't delete it
-            # But we can delete cache subdirectories within it
-            return True
 
     # Check if parent is home directory and this is a critical folder
     home = Path.home()
@@ -128,14 +123,19 @@ def is_protected_path(path: Path) -> bool:
     system = platform.system()
 
     if system == "Windows":
-        # Check Windows protected paths
         if _is_windows_protected(path):
             return True
 
     elif system == "Darwin":
-        # Check macOS protected paths
         if _is_macos_protected(path):
             return True
+
+    # Project root protection only applies to deletion, not scanning
+    if not for_scanning:
+        for indicator in PROTECTED_INDICATORS:
+            if (path / indicator).exists():
+                # This is a project root - don't delete it
+                return True
 
     return False
 

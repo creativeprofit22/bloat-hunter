@@ -22,11 +22,12 @@ def mock_project(temp_dir: Path):
     project = temp_dir / "test-project"
     project.mkdir()
 
-    # Create node_modules bloat
+    # Create node_modules bloat (>1MB to exceed min_size threshold)
     node_modules = project / "node_modules"
     node_modules.mkdir()
     (node_modules / "lodash").mkdir()
-    (node_modules / "lodash" / "index.js").write_text("// lodash")
+    # Create a file larger than 1MB to exceed the min_size threshold
+    (node_modules / "lodash" / "index.js").write_bytes(b"x" * (1024 * 1024 + 100))
 
     # Create __pycache__ bloat
     pycache = project / "__pycache__"
@@ -37,10 +38,10 @@ def mock_project(temp_dir: Path):
     pytest_cache = project / ".pytest_cache"
     pytest_cache.mkdir()
     (pytest_cache / "v" / "cache").mkdir(parents=True)
+    (pytest_cache / "v" / "cache" / "data.json").write_text("{}")
 
-    # Create actual source files
+    # Create actual source files (no pyproject.toml to avoid project root protection)
     (project / "main.py").write_text("print('hello')")
-    (project / "pyproject.toml").write_text("[project]\nname = 'test'")
 
     yield project
 

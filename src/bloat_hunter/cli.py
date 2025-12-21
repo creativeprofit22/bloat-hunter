@@ -83,7 +83,6 @@ def clean(
     interactive: bool = typer.Option(
         True,
         "--interactive/--auto",
-        "-i/-y",
         help="Interactively select what to delete (default: interactive)",
     ),
 ) -> None:

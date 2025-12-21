@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from bloat_hunter.patterns import BloatPattern
+from .base import BloatPattern
 
 
 CACHE_PATTERNS: list[BloatPattern] = [

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from bloat_hunter.patterns import BloatPattern
+from .base import BloatPattern
 
 
 SYSTEM_PATTERNS: list[BloatPattern] = [

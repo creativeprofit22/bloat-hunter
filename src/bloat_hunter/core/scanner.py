@@ -139,7 +139,7 @@ class Scanner:
         if depth > max_depth:
             return
 
-        if is_protected_path(path):
+        if is_protected_path(path, for_scanning=True):
             return
 
         try:
@@ -157,7 +157,8 @@ class Scanner:
                     if matched_pattern:
                         # Found bloat - calculate size and add to results
                         size, count = get_directory_size(entry_path)
-                        if size > 0:
+                        # Only add if size meets minimum threshold
+                        if size > 0 and size >= matched_pattern.min_size:
                             target = BloatTarget(
                                 path=entry_path,
                                 pattern=matched_pattern,
