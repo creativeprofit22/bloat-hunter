@@ -58,6 +58,45 @@ def format_size(size_bytes: int) -> str:
     return f"{size_bytes:.1f} PB"
 
 
+def parse_size(size_str: str) -> int:
+    """
+    Parse human-readable size string to bytes.
+
+    Args:
+        size_str: Size string like "1KB", "10MB", "1.5GB"
+
+    Returns:
+        Size in bytes
+
+    Raises:
+        ValueError: If the size string is invalid
+    """
+    size_str = size_str.strip().upper()
+
+    # Check longer units first to avoid "KB" matching "B"
+    units = [
+        ("TB", 1024 * 1024 * 1024 * 1024),
+        ("GB", 1024 * 1024 * 1024),
+        ("MB", 1024 * 1024),
+        ("KB", 1024),
+        ("B", 1),
+    ]
+
+    for unit, multiplier in units:
+        if size_str.endswith(unit):
+            try:
+                value = float(size_str[: -len(unit)])
+                return int(value * multiplier)
+            except ValueError:
+                raise ValueError(f"Invalid size value: {size_str}") from None
+
+    # No unit specified, assume bytes
+    try:
+        return int(float(size_str))
+    except ValueError:
+        raise ValueError(f"Invalid size string: {size_str}") from None
+
+
 def get_directory_size(path: Path) -> tuple[int, int]:
     """
     Calculate directory size efficiently using os.scandir.

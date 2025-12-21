@@ -32,11 +32,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+duplicates = [
+    "xxhash>=3.0.0",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
+    "xxhash>=3.0.0",
 ]
 
 [project.scripts]

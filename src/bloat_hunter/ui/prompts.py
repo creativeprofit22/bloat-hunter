@@ -8,6 +8,7 @@ import typer
 
 if TYPE_CHECKING:
     from bloat_hunter.core.scanner import BloatTarget
+    from bloat_hunter.core.duplicates import DuplicateGroup
 
 
 def confirm_deletion(count: int) -> bool:
@@ -86,3 +87,52 @@ def select_scan_path() -> str:
 
     except ImportError:
         return typer.prompt("Enter path to scan", default=".")
+
+
+def select_duplicate_groups(groups: list["DuplicateGroup"]) -> list["DuplicateGroup"]:
+    """
+    Let user interactively select which duplicate groups to clean.
+
+    Args:
+        groups: List of detected duplicate groups
+
+    Returns:
+        List of selected groups
+    """
+    try:
+        from InquirerPy import inquirer
+        from InquirerPy.base.control import Choice
+
+        choices = [
+            Choice(
+                value=group,
+                name=(
+                    f"{group.size_human:>10} x {len(group.files)} copies | "
+                    f"Wasted: {group.wasted_human} | "
+                    f"Hash: {group.hash_value[:12]}"
+                ),
+            )
+            for group in groups
+        ]
+
+        selected = inquirer.checkbox(
+            message="Select duplicate groups to clean (Space to toggle, Enter to confirm):",
+            choices=choices,
+            cycle=True,
+        ).execute()
+
+        return selected or []
+
+    except ImportError:
+        # Fallback to simple yes/no for each
+        typer.echo("\nInquirerPy not installed. Using simple prompts.\n")
+        selected = []
+
+        for group in groups:
+            if typer.confirm(
+                f"Clean {len(group.files)} copies of {group.size_human} file ({group.wasted_human} wasted)?",
+                default=False,
+            ):
+                selected.append(group)
+
+        return selected

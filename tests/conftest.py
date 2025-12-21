@@ -65,3 +65,42 @@ def protected_structure(temp_dir: Path):
     (cache / "temp.txt").write_text("temp")
 
     yield temp_dir
+
+
+@pytest.fixture
+def duplicate_files(temp_dir: Path):
+    """Create a structure with duplicate files."""
+    # Create identical large files (just over 1MB to exceed default min_size)
+    content = b"x" * (1024 * 1024 + 100)
+    (temp_dir / "original.bin").write_bytes(content)
+    (temp_dir / "copy1.bin").write_bytes(content)
+
+    subdir = temp_dir / "subdir"
+    subdir.mkdir()
+    (subdir / "copy2.bin").write_bytes(content)
+
+    # Different file (same size but different content)
+    (temp_dir / "different.bin").write_bytes(b"y" * (1024 * 1024 + 100))
+
+    # Small identical files (below default min_size)
+    (temp_dir / "small1.txt").write_text("small file")
+    (temp_dir / "small2.txt").write_text("small file")
+
+    yield temp_dir
+
+
+@pytest.fixture
+def duplicate_files_small(temp_dir: Path):
+    """Create small duplicate files for testing with min_size=0."""
+    content = b"duplicate content here"
+    (temp_dir / "file1.txt").write_bytes(content)
+    (temp_dir / "file2.txt").write_bytes(content)
+
+    subdir = temp_dir / "nested"
+    subdir.mkdir()
+    (subdir / "file3.txt").write_bytes(content)
+
+    # Unique file
+    (temp_dir / "unique.txt").write_bytes(b"unique content")
+
+    yield temp_dir

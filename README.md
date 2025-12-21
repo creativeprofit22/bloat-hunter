@@ -8,9 +8,10 @@ Bloat Hunter is a cross-platform CLI tool that finds and safely removes caches, 
 
 - **Cross-Platform**: Works on Windows, macOS, Linux, and WSL
 - **Smart Detection**: Finds node_modules, __pycache__, build artifacts, and more
+- **Duplicate Finder**: Hash-based duplicate file detection with configurable keep strategies
 - **Safe by Default**: Uses recycle bin, never deletes protected paths
 - **Interactive**: Preview before deleting, select specific targets
-- **Fast**: Efficient scanning with progress indicators
+- **Fast**: Efficient scanning with progress indicators, xxhash for duplicate detection
 
 ## Installation
 
@@ -70,6 +71,24 @@ Options:
   --trash/--permanent    Move to trash or permanently delete (default: trash)
   -i/-y                  Interactive selection or auto-select all
 ```
+
+### `duplicates`
+
+Find and remove duplicate files.
+
+```bash
+bloat-hunter duplicates [PATH] [OPTIONS]
+
+Options:
+  -s, --min-size TEXT    Minimum file size to consider (default: 1MB)
+  --dry-run/--execute    Preview changes without deleting (default: dry-run)
+  --trash/--permanent    Move to trash or permanently delete (default: trash)
+  -k, --keep TEXT        Which file to keep: first, shortest, oldest, newest
+  -a, --all              Show all duplicate groups (default: top 20)
+  --interactive/--auto   Select groups to clean or auto-select all
+```
+
+Uses fast xxhash hashing with a two-phase approach: first groups files by size, then hashes only candidates.
 
 ### `info`
 

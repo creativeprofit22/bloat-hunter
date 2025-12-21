@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, MofNCompleteColumn
 
 from bloat_hunter.core.scanner import BloatTarget, format_size
+from bloat_hunter.core.duplicates import DuplicateGroup, KeepStrategy
 from bloat_hunter.safety.protected import is_protected_path
 
 
@@ -112,3 +113,92 @@ class Cleaner:
             shutil.rmtree(path, ignore_errors=True)
         else:
             path.unlink(missing_ok=True)
+
+    def clean_duplicates(
+        self,
+        groups: list[DuplicateGroup],
+        strategy: KeepStrategy,
+    ) -> tuple[int, int]:
+        """
+        Clean duplicate files while keeping one copy per group.
+
+        Args:
+            groups: List of duplicate groups to clean
+            strategy: Which file to keep in each group
+
+        Returns:
+            Tuple of (files_deleted, failures)
+        """
+        # Collect all files to delete
+        files_to_delete: list[Path] = []
+        for group in groups:
+            for dup in group.get_duplicates_to_remove(strategy):
+                files_to_delete.append(dup.path)
+
+        if not files_to_delete:
+            return 0, 0
+
+        success_count = 0
+        failure_count = 0
+        freed_bytes = 0
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            console=self.console,
+        ) as progress:
+            task = progress.add_task("Cleaning duplicates...", total=len(files_to_delete))
+
+            for file_path in files_to_delete:
+                progress.update(task, description=f"Deleting: {file_path.name[:40]}")
+
+                try:
+                    # Get size before deletion for accurate reporting
+                    try:
+                        file_size = file_path.stat().st_size
+                    except OSError:
+                        file_size = 0
+
+                    self._delete_file(file_path)
+                    success_count += 1
+                    freed_bytes += file_size
+                except Exception as e:
+                    failure_count += 1
+                    self.console.print(f"[red]Failed to delete {file_path}: {e}[/red]")
+
+                progress.advance(task)
+
+        # Summary
+        self.console.print()
+        if success_count > 0:
+            self.console.print(
+                f"[green]Successfully deleted {success_count} duplicate files, "
+                f"freed {format_size(freed_bytes)}[/green]"
+            )
+        if failure_count > 0:
+            self.console.print(f"[red]Failed to delete {failure_count} files[/red]")
+
+        return success_count, failure_count
+
+    def _delete_file(self, path: Path) -> None:
+        """Delete a single file safely."""
+        # Safety check
+        if is_protected_path(path):
+            raise CleanerError(f"Refusing to delete protected path: {path}")
+
+        if not path.exists():
+            return  # Already deleted
+
+        # Use trash if available, otherwise permanent delete
+        if self._send2trash:
+            try:
+                self._send2trash(str(path.absolute()))
+                return
+            except Exception:
+                # Fall back to permanent deletion
+                pass
+
+        # Permanent deletion
+        path.unlink(missing_ok=True)
