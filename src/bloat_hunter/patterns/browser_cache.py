@@ -5,8 +5,22 @@ from __future__ import annotations
 from .base import BloatPattern
 
 
+# ============================================================================
+# Size Thresholds for Pattern Matching
+# ============================================================================
+
+MIN_SIZE_DEFAULT = 0  # No minimum
+MIN_SIZE_LARGE_CACHE = 50 * 1024 * 1024  # 50 MB
+
+
+# ============================================================================
+# Browser Caches
+# ============================================================================
+
 BROWSER_CACHE_PATTERNS: list[BloatPattern] = [
+    # --------------------------------------------------------------------------
     # Chrome/Chromium (all platforms)
+    # --------------------------------------------------------------------------
     BloatPattern(
         name="Chrome Cache",
         category="Browser",
@@ -29,7 +43,9 @@ BROWSER_CACHE_PATTERNS: list[BloatPattern] = [
         safe_level="caution",
     ),
 
+    # --------------------------------------------------------------------------
     # Firefox
+    # --------------------------------------------------------------------------
     BloatPattern(
         name="Firefox Cache",
         category="Browser",
@@ -45,7 +61,9 @@ BROWSER_CACHE_PATTERNS: list[BloatPattern] = [
         safe_level="safe",
     ),
 
+    # --------------------------------------------------------------------------
     # Edge (Chromium-based)
+    # --------------------------------------------------------------------------
     BloatPattern(
         name="Edge Cache",
         category="Browser",
@@ -54,7 +72,9 @@ BROWSER_CACHE_PATTERNS: list[BloatPattern] = [
         safe_level="safe",
     ),
 
+    # --------------------------------------------------------------------------
     # Safari (macOS)
+    # --------------------------------------------------------------------------
     BloatPattern(
         name="Safari Cache",
         category="Browser",
@@ -72,8 +92,14 @@ BROWSER_CACHE_PATTERNS: list[BloatPattern] = [
 ]
 
 
+# ============================================================================
+# Package Manager Caches
+# ============================================================================
+
 PACKAGE_MANAGER_PATTERNS: list[BloatPattern] = [
-    # npm/yarn/pnpm
+    # --------------------------------------------------------------------------
+    # Node.js (npm, yarn, pnpm)
+    # --------------------------------------------------------------------------
     BloatPattern(
         name="npm cache",
         category="Package Manager",
@@ -96,7 +122,9 @@ PACKAGE_MANAGER_PATTERNS: list[BloatPattern] = [
         safe_level="safe",
     ),
 
-    # pip
+    # --------------------------------------------------------------------------
+    # Python (pip, pipx)
+    # --------------------------------------------------------------------------
     BloatPattern(
         name="pip cache",
         category="Package Manager",
@@ -112,14 +140,16 @@ PACKAGE_MANAGER_PATTERNS: list[BloatPattern] = [
         safe_level="safe",
     ),
 
-    # Cargo (Rust)
+    # --------------------------------------------------------------------------
+    # Rust (Cargo)
+    # --------------------------------------------------------------------------
     BloatPattern(
         name="Cargo registry",
         category="Package Manager",
         patterns=["registry"],
         description="Cargo package registry cache",
         safe_level="caution",
-        min_size=50 * 1024 * 1024,  # Only if > 50MB
+        min_size=MIN_SIZE_LARGE_CACHE,  # Only if > 50MB
     ),
     BloatPattern(
         name="Cargo git",
@@ -127,10 +157,12 @@ PACKAGE_MANAGER_PATTERNS: list[BloatPattern] = [
         patterns=["checkouts", "re:^db$"],
         description="Cargo git dependencies cache",
         safe_level="caution",
-        min_size=50 * 1024 * 1024,  # Only if > 50MB
+        min_size=MIN_SIZE_LARGE_CACHE,  # Only if > 50MB
     ),
 
-    # Go modules
+    # --------------------------------------------------------------------------
+    # Go
+    # --------------------------------------------------------------------------
     BloatPattern(
         name="Go build cache",
         category="Package Manager",
@@ -146,10 +178,12 @@ PACKAGE_MANAGER_PATTERNS: list[BloatPattern] = [
         safe_level="caution",
     ),
 
+    # --------------------------------------------------------------------------
+    # Java (Maven, Gradle)
+    # --------------------------------------------------------------------------
     # Maven - detected via explicit ~/.m2/repository path in detect.py
     # No pattern needed as "repository" is too generic
 
-    # Gradle
     BloatPattern(
         name="Gradle caches",
         category="Package Manager",
@@ -158,7 +192,9 @@ PACKAGE_MANAGER_PATTERNS: list[BloatPattern] = [
         safe_level="safe",
     ),
 
-    # Composer (PHP)
+    # --------------------------------------------------------------------------
+    # PHP (Composer)
+    # --------------------------------------------------------------------------
     BloatPattern(
         name="Composer cache",
         category="Package Manager",
@@ -167,7 +203,9 @@ PACKAGE_MANAGER_PATTERNS: list[BloatPattern] = [
         safe_level="safe",
     ),
 
-    # NuGet (.NET)
+    # --------------------------------------------------------------------------
+    # .NET (NuGet)
+    # --------------------------------------------------------------------------
     BloatPattern(
         name="NuGet cache",
         category="Package Manager",
@@ -176,7 +214,9 @@ PACKAGE_MANAGER_PATTERNS: list[BloatPattern] = [
         safe_level="safe",
     ),
 
-    # Bundler (Ruby)
+    # --------------------------------------------------------------------------
+    # Ruby (Bundler)
+    # --------------------------------------------------------------------------
     BloatPattern(
         name="Bundler cache",
         category="Package Manager",
@@ -187,7 +227,15 @@ PACKAGE_MANAGER_PATTERNS: list[BloatPattern] = [
 ]
 
 
+# ============================================================================
+# Application Caches
+# ============================================================================
+
 APP_CACHE_PATTERNS: list[BloatPattern] = [
+    # --------------------------------------------------------------------------
+    # Development Tools
+    # --------------------------------------------------------------------------
+
     # VS Code
     BloatPattern(
         name="VS Code Cache",
@@ -201,22 +249,6 @@ APP_CACHE_PATTERNS: list[BloatPattern] = [
         category="App",
         patterns=["Crashpad"],
         description="VS Code crash reports",
-        safe_level="safe",
-    ),
-
-    # Electron apps (Slack, Discord, Teams, etc.)
-    BloatPattern(
-        name="Electron GPU Cache",
-        category="App",
-        patterns=["GPUCache", "gpu-process-preferences"],
-        description="Electron app GPU cache",
-        safe_level="safe",
-    ),
-    BloatPattern(
-        name="Electron Blob Storage",
-        category="App",
-        patterns=["blob_storage"],
-        description="Electron blob storage",
         safe_level="safe",
     ),
 
@@ -248,59 +280,27 @@ APP_CACHE_PATTERNS: list[BloatPattern] = [
         safe_level="caution",
     ),
 
-    # Thumbnails
+    # --------------------------------------------------------------------------
+    # Electron Apps (Generic)
+    # --------------------------------------------------------------------------
     BloatPattern(
-        name="Thumbnails",
-        category="System",
-        patterns=["thumbnails", "Thumbnails"],
-        description="Image thumbnail cache",
-        safe_level="safe",
-    ),
-
-    # Font cache
-    BloatPattern(
-        name="Font Cache",
-        category="System",
-        patterns=["fontconfig"],
-        description="Font rendering cache",
-        safe_level="safe",
-    ),
-
-    # Mesa/GPU shaders
-    BloatPattern(
-        name="Mesa Shader Cache",
-        category="System",
-        patterns=["mesa_shader_cache", "mesa_shader_cache_db"],
-        description="Mesa GPU shader cache",
-        safe_level="safe",
-    ),
-
-    # NVIDIA
-    BloatPattern(
-        name="NVIDIA Cache",
-        category="System",
-        patterns=["nvidia", "GLCache", "ComputeCache"],
-        description="NVIDIA GPU cache",
-        safe_level="safe",
-    ),
-
-    # AMD
-    BloatPattern(
-        name="AMD Cache",
-        category="System",
-        patterns=["AMD", "VkCache"],
-        description="AMD GPU cache",
-        safe_level="safe",
-    ),
-
-    # Spotify
-    BloatPattern(
-        name="Spotify Cache",
+        name="Electron GPU Cache",
         category="App",
-        patterns=["re:^spotify$", "re:^Spotify$"],
-        description="Spotify streaming cache",
+        patterns=["GPUCache", "gpu-process-preferences"],
+        description="Electron app GPU cache",
         safe_level="safe",
     ),
+    BloatPattern(
+        name="Electron Blob Storage",
+        category="App",
+        patterns=["blob_storage"],
+        description="Electron blob storage",
+        safe_level="safe",
+    ),
+
+    # --------------------------------------------------------------------------
+    # Communication Apps
+    # --------------------------------------------------------------------------
 
     # Microsoft Teams
     BloatPattern(
@@ -335,6 +335,72 @@ APP_CACHE_PATTERNS: list[BloatPattern] = [
         category="App",
         patterns=["re:^[Zz]oom$", "re:^zoom\\.us$"],
         description="Zoom cache",
+        safe_level="safe",
+    ),
+
+    # --------------------------------------------------------------------------
+    # Media Apps
+    # --------------------------------------------------------------------------
+
+    # Spotify
+    BloatPattern(
+        name="Spotify Cache",
+        category="App",
+        patterns=["re:^spotify$", "re:^Spotify$"],
+        description="Spotify streaming cache",
+        safe_level="safe",
+    ),
+
+    # --------------------------------------------------------------------------
+    # System Caches
+    # --------------------------------------------------------------------------
+
+    # Thumbnails
+    BloatPattern(
+        name="Thumbnails",
+        category="System",
+        patterns=["thumbnails", "Thumbnails"],
+        description="Image thumbnail cache",
+        safe_level="safe",
+    ),
+
+    # Font cache
+    BloatPattern(
+        name="Font Cache",
+        category="System",
+        patterns=["fontconfig"],
+        description="Font rendering cache",
+        safe_level="safe",
+    ),
+
+    # --------------------------------------------------------------------------
+    # GPU Caches
+    # --------------------------------------------------------------------------
+
+    # Mesa/GPU shaders
+    BloatPattern(
+        name="Mesa Shader Cache",
+        category="System",
+        patterns=["mesa_shader_cache", "mesa_shader_cache_db"],
+        description="Mesa GPU shader cache",
+        safe_level="safe",
+    ),
+
+    # NVIDIA
+    BloatPattern(
+        name="NVIDIA Cache",
+        category="System",
+        patterns=["nvidia", "GLCache", "ComputeCache"],
+        description="NVIDIA GPU cache",
+        safe_level="safe",
+    ),
+
+    # AMD
+    BloatPattern(
+        name="AMD Cache",
+        category="System",
+        patterns=["AMD", "VkCache"],
+        description="AMD GPU cache",
         safe_level="safe",
     ),
 ]

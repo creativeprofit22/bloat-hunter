@@ -117,7 +117,7 @@ class CacheScanner:
                 progress.update(task, description=f"Scanning: {cache_path.name}")
 
                 try:
-                    self._scan_cache_root(cache_path, category, result)
+                    self._scan_directory(cache_path, result, depth=0)
                     result.categories_scanned[category] = (
                         result.categories_scanned.get(category, 0) + 1
                     )
@@ -127,13 +127,8 @@ class CacheScanner:
                 progress.advance(task)
 
         # Deduplicate targets (same path might be found from multiple cache roots)
-        seen_paths: set[Path] = set()
-        unique_targets: list[BloatTarget] = []
-        for target in result.targets:
-            if target.path not in seen_paths:
-                seen_paths.add(target.path)
-                unique_targets.append(target)
-        result.targets = unique_targets
+        # Use dict for O(1) lookup instead of set iteration
+        result.targets = list({t.path: t for t in result.targets}.values())
 
         # Sort by size descending
         result.targets.sort(key=lambda t: t.size_bytes, reverse=True)
@@ -141,75 +136,39 @@ class CacheScanner:
 
         return result
 
-    def _scan_cache_root(
-        self,
-        root: Path,
-        category: str,
-        result: CacheScanResult,
-    ) -> None:
-        """Scan a cache root directory."""
-        if is_protected_path(root, for_scanning=True):
-            return
-
-        # Try to match the root itself against patterns
-        matched = self._match_against_patterns(root)
-        if matched:
-            size, count = get_directory_size(root)
-            if size >= matched.min_size:
-                result.targets.append(
-                    BloatTarget(
-                        path=root,
-                        pattern=matched,
-                        size_bytes=size,
-                        file_count=count,
-                    )
-                )
-            return
-
-        # Otherwise, scan subdirectories
-        try:
-            with os.scandir(root) as entries:
-                for entry in entries:
-                    if not entry.is_dir(follow_symlinks=False):
-                        continue
-
-                    entry_path = Path(entry.path)
-
-                    if is_protected_path(entry_path, for_scanning=True):
-                        continue
-
-                    matched = self._match_against_patterns(entry_path)
-                    if matched:
-                        size, count = get_directory_size(entry_path)
-                        if size >= matched.min_size:
-                            result.targets.append(
-                                BloatTarget(
-                                    path=entry_path,
-                                    pattern=matched,
-                                    size_bytes=size,
-                                    file_count=count,
-                                )
-                            )
-                    else:
-                        # Recurse one more level for nested caches
-                        self._scan_subdirectory(
-                            entry_path, result, depth=1, max_depth=3
-                        )
-
-        except (PermissionError, OSError) as e:
-            result.scan_errors.append(f"{root}: {e}")
-
-    def _scan_subdirectory(
+    def _scan_directory(
         self,
         path: Path,
         result: CacheScanResult,
-        depth: int,
-        max_depth: int,
+        depth: int = 0,
+        max_depth: int = 3,
     ) -> None:
-        """Recursively scan subdirectories for cache patterns."""
+        """
+        Recursively scan a directory for cache patterns.
+
+        Args:
+            path: Directory path to scan
+            result: CacheScanResult to populate with targets
+            depth: Current recursion depth (0 = root)
+            max_depth: Maximum recursion depth
+        """
+        if is_protected_path(path, for_scanning=True):
+            return
+
+        # At depth=0, try to match the root itself first
+        if depth == 0:
+            matched = self._match_against_patterns(path)
+            if matched:
+                target = self._create_target(path, matched)
+                if target:
+                    result.targets.append(target)
+                return
+
+        # Don't recurse beyond max_depth
         if depth > max_depth:
             return
 
+        # Scan subdirectories
         try:
             with os.scandir(path) as entries:
                 for entry in entries:
@@ -223,18 +182,12 @@ class CacheScanner:
 
                     matched = self._match_against_patterns(entry_path)
                     if matched:
-                        size, count = get_directory_size(entry_path)
-                        if size >= matched.min_size:
-                            result.targets.append(
-                                BloatTarget(
-                                    path=entry_path,
-                                    pattern=matched,
-                                    size_bytes=size,
-                                    file_count=count,
-                                )
-                            )
+                        target = self._create_target(entry_path, matched)
+                        if target:
+                            result.targets.append(target)
                     else:
-                        self._scan_subdirectory(
+                        # Recurse deeper for nested caches
+                        self._scan_directory(
                             entry_path, result, depth + 1, max_depth
                         )
 
@@ -247,4 +200,30 @@ class CacheScanner:
         for pattern in self.patterns:
             if pattern.matches(name, path):
                 return pattern
+        return None
+
+    def _create_target(
+        self, path: Path, pattern: BloatPattern
+    ) -> Optional[BloatTarget]:
+        """
+        Create a BloatTarget for a path matching a pattern.
+
+        Args:
+            path: Directory path to create target for
+            pattern: The matched bloat pattern
+
+        Returns:
+            BloatTarget if size meets minimum threshold, None otherwise
+        """
+        try:
+            size, count = get_directory_size(path)
+            if size >= pattern.min_size:
+                return BloatTarget(
+                    path=path,
+                    pattern=pattern,
+                    size_bytes=size,
+                    file_count=count,
+                )
+        except (PermissionError, OSError):
+            pass
         return None

@@ -4,85 +4,93 @@ from __future__ import annotations
 
 import os
 import platform
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Set
 
-# Paths that should NEVER be deleted
-PROTECTED_PATTERNS: Set[str] = {
-    # System directories
-    "/",
-    "/bin",
-    "/boot",
-    "/dev",
-    "/etc",
-    "/lib",
-    "/lib64",
-    "/opt",
-    "/proc",
-    "/root",
-    "/run",
-    "/sbin",
-    "/srv",
-    "/sys",
-    "/tmp",
-    "/usr",
-    "/var",
 
-    # Windows system
-    "C:\\",
-    "C:\\Windows",
-    "C:\\Program Files",
-    "C:\\Program Files (x86)",
-    "C:\\ProgramData",
+@dataclass(frozen=True)
+class ProtectedConfig:
+    """Configuration for protected paths, names, and project indicators."""
 
-    # WSL mounts
-    "/mnt/c/Windows",
-    "/mnt/c/Program Files",
-    "/mnt/c/Program Files (x86)",
-    "/mnt/c/ProgramData",
+    system_paths: frozenset[str]
+    """Paths that should NEVER be deleted (system directories, critical user folders)."""
 
-    # macOS system
-    "/System",
-    "/Library",
-    "/Applications",
-    "/private",
+    critical_names: frozenset[str]
+    """Directory names that should never be deleted regardless of path."""
 
-    # User-critical directories
-    "Documents",
-    "Desktop",
-    "Downloads",
-    "Pictures",
-    "Music",
-    "Videos",
-    ".ssh",
-    ".gnupg",
-    ".config",
-}
+    project_indicators: frozenset[str]
+    """Files that indicate a directory is a project root."""
 
-# Directory names that should never be deleted regardless of path
-PROTECTED_NAMES: Set[str] = {
-    ".ssh",
-    ".gnupg",
-    ".gpg",
-    ".aws",
-    ".kube",
-    ".docker",  # config, not cache
-    "credentials",
-    "secrets",
-    ".password-store",
-    ".local/share/keyrings",
-}
 
-# Files that indicate a directory is important
-PROTECTED_INDICATORS: Set[str] = {
-    ".git",  # Git repository root
-    "package.json",  # Node.js project root
-    "pyproject.toml",  # Python project root
-    "Cargo.toml",  # Rust project root
-    "go.mod",  # Go project root
-    "pom.xml",  # Java Maven project
-    "build.gradle",  # Java Gradle project
-}
+PROTECTED = ProtectedConfig(
+    system_paths=frozenset({
+        # System directories
+        "/",
+        "/bin",
+        "/boot",
+        "/dev",
+        "/etc",
+        "/lib",
+        "/lib64",
+        "/opt",
+        "/proc",
+        "/root",
+        "/run",
+        "/sbin",
+        "/srv",
+        "/sys",
+        "/tmp",
+        "/usr",
+        "/var",
+        # Windows system
+        "C:\\",
+        "C:\\Windows",
+        "C:\\Program Files",
+        "C:\\Program Files (x86)",
+        "C:\\ProgramData",
+        # WSL mounts
+        "/mnt/c/Windows",
+        "/mnt/c/Program Files",
+        "/mnt/c/Program Files (x86)",
+        "/mnt/c/ProgramData",
+        # macOS system
+        "/System",
+        "/Library",
+        "/Applications",
+        "/private",
+        # User-critical directories
+        "Documents",
+        "Desktop",
+        "Downloads",
+        "Pictures",
+        "Music",
+        "Videos",
+        ".ssh",
+        ".gnupg",
+        ".config",
+    }),
+    critical_names=frozenset({
+        ".ssh",
+        ".gnupg",
+        ".gpg",
+        ".aws",
+        ".kube",
+        ".docker",  # config, not cache
+        "credentials",
+        "secrets",
+        ".password-store",
+        ".local/share/keyrings",
+    }),
+    project_indicators=frozenset({
+        ".git",  # Git repository root
+        "package.json",  # Node.js project root
+        "pyproject.toml",  # Python project root
+        "Cargo.toml",  # Rust project root
+        "go.mod",  # Go project root
+        "pom.xml",  # Java Maven project
+        "build.gradle",  # Java Gradle project
+    }),
+)
 
 
 def is_protected_path(path: Path, for_scanning: bool = False) -> bool:
@@ -101,7 +109,7 @@ def is_protected_path(path: Path, for_scanning: bool = False) -> bool:
     path_lower = path_str.lower()
 
     # Check absolute protected paths (always skip these)
-    for protected in PROTECTED_PATTERNS:
+    for protected in PROTECTED.system_paths:
         protected_lower = protected.lower()
         if path_lower == protected_lower or path_lower.startswith(protected_lower + os.sep):
             # Allow if we're looking at a subdirectory that's specifically a cache
@@ -109,7 +117,7 @@ def is_protected_path(path: Path, for_scanning: bool = False) -> bool:
                 return True
 
     # Check protected names (always skip)
-    if path.name in PROTECTED_NAMES:
+    if path.name in PROTECTED.critical_names:
         return True
 
     # Check if parent is home directory and this is a critical folder
@@ -132,7 +140,7 @@ def is_protected_path(path: Path, for_scanning: bool = False) -> bool:
 
     # Project root protection only applies to deletion, not scanning
     if not for_scanning:
-        for indicator in PROTECTED_INDICATORS:
+        for indicator in PROTECTED.project_indicators:
             if (path / indicator).exists():
                 # This is a project root - don't delete it
                 return True

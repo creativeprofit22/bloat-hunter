@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Literal
 
 import typer
-from rich.console import Console
 
 from bloat_hunter import __version__
-from bloat_hunter.core.scanner import Scanner, parse_size
+from bloat_hunter.core.scanner import Scanner, ScanResult, parse_size
+from bloat_hunter.core.cache_scanner import CacheScanner
 from bloat_hunter.core.analyzer import Analyzer
 from bloat_hunter.core.cleaner import Cleaner
 from bloat_hunter.core.duplicates import DuplicateScanner, KeepStrategy
@@ -23,6 +23,28 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = create_console()
+
+# Valid keep strategies for duplicate file selection
+VALID_KEEP_STRATEGIES: tuple[KeepStrategy, ...] = ("first", "shortest", "oldest", "newest")
+
+# Shared CLI option defaults to avoid repetition (DRY principle)
+DRY_RUN_OPTION = typer.Option(
+    True,
+    "--dry-run/--execute",
+    help="Preview changes without deleting (default: dry-run)",
+)
+
+TRASH_OPTION = typer.Option(
+    True,
+    "--trash/--permanent",
+    help="Move to trash instead of permanent deletion (default: trash)",
+)
+
+INTERACTIVE_OPTION = typer.Option(
+    True,
+    "--interactive/--auto",
+    help="Interactively select what to delete (default: interactive)",
+)
 
 
 @app.command()
@@ -71,21 +93,9 @@ def clean(
         dir_okay=True,
         resolve_path=True,
     ),
-    dry_run: bool = typer.Option(
-        True,
-        "--dry-run/--execute",
-        help="Preview changes without deleting (default: dry-run)",
-    ),
-    trash: bool = typer.Option(
-        True,
-        "--trash/--permanent",
-        help="Move to trash instead of permanent deletion (default: trash)",
-    ),
-    interactive: bool = typer.Option(
-        True,
-        "--interactive/--auto",
-        help="Interactively select what to delete (default: interactive)",
-    ),
+    dry_run: bool = DRY_RUN_OPTION,
+    trash: bool = TRASH_OPTION,
+    interactive: bool = INTERACTIVE_OPTION,
 ) -> None:
     """Clean up bloat and caches from a directory."""
     print_banner(console)
@@ -141,16 +151,8 @@ def duplicates(
         "-s",
         help="Minimum file size to consider (e.g., 1KB, 1MB, 10MB)",
     ),
-    dry_run: bool = typer.Option(
-        True,
-        "--dry-run/--execute",
-        help="Preview changes without deleting (default: dry-run)",
-    ),
-    trash: bool = typer.Option(
-        True,
-        "--trash/--permanent",
-        help="Move to trash instead of permanent deletion (default: trash)",
-    ),
+    dry_run: bool = DRY_RUN_OPTION,
+    trash: bool = TRASH_OPTION,
     keep: str = typer.Option(
         "first",
         "--keep",
@@ -163,20 +165,15 @@ def duplicates(
         "-a",
         help="Show all duplicate groups (default: top 20)",
     ),
-    interactive: bool = typer.Option(
-        True,
-        "--interactive/--auto",
-        help="Interactively select which groups to clean",
-    ),
+    interactive: bool = INTERACTIVE_OPTION,
 ) -> None:
     """Find and optionally remove duplicate files."""
     print_banner(console)
 
     # Validate keep strategy
-    valid_strategies: list[KeepStrategy] = ["first", "shortest", "oldest", "newest"]
-    if keep not in valid_strategies:
+    if keep not in VALID_KEEP_STRATEGIES:
         console.print(f"[red]Invalid keep strategy: {keep}[/red]")
-        console.print(f"[dim]Valid options: {', '.join(valid_strategies)}[/dim]")
+        console.print(f"[dim]Valid options: {', '.join(VALID_KEEP_STRATEGIES)}[/dim]")
         raise typer.Exit(1)
 
     keep_strategy: KeepStrategy = keep  # type: ignore[assignment]
@@ -233,21 +230,9 @@ def duplicates(
 
 @app.command()
 def caches(
-    dry_run: bool = typer.Option(
-        True,
-        "--dry-run/--execute",
-        help="Preview changes without deleting (default: dry-run)",
-    ),
-    trash: bool = typer.Option(
-        True,
-        "--trash/--permanent",
-        help="Move to trash instead of permanent deletion (default: trash)",
-    ),
-    interactive: bool = typer.Option(
-        True,
-        "--interactive/--auto",
-        help="Interactively select what to delete (default: interactive)",
-    ),
+    dry_run: bool = DRY_RUN_OPTION,
+    trash: bool = TRASH_OPTION,
+    interactive: bool = INTERACTIVE_OPTION,
     browsers: bool = typer.Option(
         True,
         "--browsers/--no-browsers",
@@ -286,10 +271,6 @@ def caches(
         console.print(f"[dim]WSL Windows caches: {wsl_status}[/dim]")
 
     console.print()
-
-    # Import here to avoid circular imports
-    from bloat_hunter.core.cache_scanner import CacheScanner
-    from bloat_hunter.core.scanner import ScanResult
 
     scanner = CacheScanner(
         console=console,

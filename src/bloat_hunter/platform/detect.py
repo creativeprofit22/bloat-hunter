@@ -10,6 +10,40 @@ from typing import Optional
 
 
 @dataclass
+class WindowsEnvPaths:
+    """Windows environment paths (LOCALAPPDATA, APPDATA, etc.)."""
+
+    local_app_data: Optional[Path] = None
+    app_data: Optional[Path] = None
+
+    @classmethod
+    def from_environ(cls) -> "WindowsEnvPaths":
+        """Create from current environment variables."""
+        local = os.environ.get("LOCALAPPDATA")
+        app = os.environ.get("APPDATA")
+        return cls(
+            local_app_data=Path(local) if local else None,
+            app_data=Path(app) if app else None,
+        )
+
+
+@dataclass
+class XdgPaths:
+    """XDG Base Directory paths for Linux/Unix."""
+
+    cache_home: Path
+    config_home: Path
+
+    @classmethod
+    def from_environ(cls, home_dir: Path) -> "XdgPaths":
+        """Create from current environment variables with home fallback."""
+        return cls(
+            cache_home=Path(os.environ.get("XDG_CACHE_HOME") or (home_dir / ".cache")),
+            config_home=Path(os.environ.get("XDG_CONFIG_HOME") or (home_dir / ".config")),
+        )
+
+
+@dataclass
 class PlatformInfo:
     """Information about the current platform."""
 
@@ -65,9 +99,9 @@ def _detect_wsl() -> tuple[bool, Optional[str], Optional[Path]]:
 
 
 def _get_linux_distro() -> str:
-    """Get Linux distribution name."""
+    """Get Linux distribution name from /etc/os-release."""
     try:
-        # Try /etc/os-release first
+        # Parse /etc/os-release for distribution info
         if os.path.exists("/etc/os-release"):
             with open("/etc/os-release") as f:
                 for line in f:
@@ -75,11 +109,10 @@ def _get_linux_distro() -> str:
                         return line.split("=")[1].strip().strip('"')
                     elif line.startswith("NAME="):
                         return line.split("=")[1].strip().strip('"')
-
-        # Fallback to platform
-        return platform.linux_distribution()[0] if hasattr(platform, 'linux_distribution') else "Linux"
     except Exception:
-        return "Linux"
+        pass
+
+    return "Linux"
 
 
 def get_platform_info() -> PlatformInfo:
@@ -146,133 +179,188 @@ def get_default_scan_paths() -> list[Path]:
     return paths
 
 
+def _get_windows_system_cache_paths(win_paths: WindowsEnvPaths) -> list[Path]:
+    """Get Windows system cache paths."""
+    if not win_paths.local_app_data:
+        return []
+    lap = win_paths.local_app_data
+    return [
+        lap / "Temp",
+        lap / "npm-cache",
+        lap / "pip" / "cache",
+    ]
+
+
+def _get_macos_system_cache_paths(home_dir: Path) -> list[Path]:
+    """Get macOS system cache paths."""
+    return [
+        home_dir / "Library" / "Caches",
+        home_dir / ".npm",
+        home_dir / ".cache",
+    ]
+
+
+def _get_linux_system_cache_paths(
+    home_dir: Path,
+    is_wsl: bool = False,
+    windows_home: Optional[Path] = None,
+) -> list[Path]:
+    """Get Linux system cache paths, including WSL Windows paths if applicable."""
+    paths = [
+        home_dir / ".cache",
+        home_dir / ".npm",
+        home_dir / ".local" / "share" / "Trash",
+    ]
+    if is_wsl and windows_home:
+        paths.append(windows_home / "AppData" / "Local" / "Temp")
+    return paths
+
+
 def get_system_cache_paths(info: Optional[PlatformInfo] = None) -> list[Path]:
     """Get system-level cache paths for the current platform."""
     if info is None:
         info = get_platform_info()
-    paths: list[Path] = []
 
     if info.name == "Windows":
-        local_app_data = os.environ.get("LOCALAPPDATA")
-        if local_app_data:
-            paths.extend([
-                Path(local_app_data) / "Temp",
-                Path(local_app_data) / "npm-cache",
-                Path(local_app_data) / "pip" / "cache",
-            ])
-
+        paths = _get_windows_system_cache_paths(WindowsEnvPaths.from_environ())
     elif info.name == "macOS":
-        paths.extend([
-            info.home_dir / "Library" / "Caches",
-            info.home_dir / ".npm",
-            info.home_dir / ".cache",
-        ])
-
+        paths = _get_macos_system_cache_paths(info.home_dir)
     elif info.name == "Linux":
-        paths.extend([
-            info.home_dir / ".cache",
-            info.home_dir / ".npm",
-            info.home_dir / ".local" / "share" / "Trash",
-        ])
-
-        # WSL: Also check Windows temp
-        if info.is_wsl and info.windows_home:
-            paths.append(info.windows_home / "AppData" / "Local" / "Temp")
+        paths = _get_linux_system_cache_paths(
+            info.home_dir,
+            is_wsl=info.is_wsl,
+            windows_home=info.windows_home,
+        )
+    else:
+        paths = []
 
     return [p for p in paths if p.exists()]
+
+
+def _get_windows_browser_cache_paths(win_paths: WindowsEnvPaths) -> list[Path]:
+    """Get Windows browser cache paths."""
+    paths: list[Path] = []
+    if win_paths.local_app_data:
+        lap = win_paths.local_app_data
+        paths.extend([
+            # Chrome
+            lap / "Google" / "Chrome" / "User Data" / "Default" / "Cache",
+            lap / "Google" / "Chrome" / "User Data" / "Default" / "Code Cache",
+            # Edge
+            lap / "Microsoft" / "Edge" / "User Data" / "Default" / "Cache",
+            lap / "Microsoft" / "Edge" / "User Data" / "Default" / "Code Cache",
+        ])
+    if win_paths.app_data:
+        paths.append(win_paths.app_data / "Mozilla" / "Firefox" / "Profiles")
+    return paths
+
+
+def _get_macos_browser_cache_paths(home_dir: Path) -> list[Path]:
+    """Get macOS browser cache paths."""
+    return [
+        home_dir / "Library" / "Caches" / "Google" / "Chrome",
+        home_dir / "Library" / "Caches" / "com.apple.Safari",
+        home_dir / "Library" / "Caches" / "Firefox",
+        home_dir / "Library" / "Caches" / "com.microsoft.Edge",
+    ]
+
+
+def _get_linux_browser_cache_paths(
+    xdg: XdgPaths,
+    is_wsl: bool = False,
+    windows_home: Optional[Path] = None,
+) -> list[Path]:
+    """Get Linux browser cache paths, including WSL Windows paths if applicable."""
+    paths = [
+        xdg.cache_home / "google-chrome",
+        xdg.cache_home / "chromium",
+        xdg.cache_home / "mozilla" / "firefox",
+        xdg.cache_home / "microsoft-edge",
+        xdg.config_home / "google-chrome",
+        xdg.config_home / "chromium",
+        xdg.config_home / "microsoft-edge",
+    ]
+    if is_wsl and windows_home:
+        lap = windows_home / "AppData" / "Local"
+        paths.extend([
+            lap / "Google" / "Chrome" / "User Data" / "Default" / "Cache",
+            lap / "Microsoft" / "Edge" / "User Data" / "Default" / "Cache",
+        ])
+    return paths
 
 
 def get_browser_cache_paths(info: Optional[PlatformInfo] = None) -> list[Path]:
     """Get browser-specific cache paths for the current platform."""
     if info is None:
         info = get_platform_info()
-    paths: list[Path] = []
 
     if info.name == "Windows":
-        local_app_data = os.environ.get("LOCALAPPDATA")
-        app_data = os.environ.get("APPDATA")
-        if local_app_data:
-            lap = Path(local_app_data)
-            paths.extend([
-                # Chrome
-                lap / "Google" / "Chrome" / "User Data" / "Default" / "Cache",
-                lap / "Google" / "Chrome" / "User Data" / "Default" / "Code Cache",
-                # Edge
-                lap / "Microsoft" / "Edge" / "User Data" / "Default" / "Cache",
-                lap / "Microsoft" / "Edge" / "User Data" / "Default" / "Code Cache",
-            ])
-        if app_data:
-            paths.append(Path(app_data) / "Mozilla" / "Firefox" / "Profiles")
-
+        paths = _get_windows_browser_cache_paths(WindowsEnvPaths.from_environ())
     elif info.name == "macOS":
-        paths.extend([
-            info.home_dir / "Library" / "Caches" / "Google" / "Chrome",
-            info.home_dir / "Library" / "Caches" / "com.apple.Safari",
-            info.home_dir / "Library" / "Caches" / "Firefox",
-            info.home_dir / "Library" / "Caches" / "com.microsoft.Edge",
-        ])
-
+        paths = _get_macos_browser_cache_paths(info.home_dir)
     elif info.name == "Linux":
-        cache_home = Path(os.environ.get("XDG_CACHE_HOME") or (info.home_dir / ".cache"))
-        config_home = Path(os.environ.get("XDG_CONFIG_HOME") or (info.home_dir / ".config"))
-        paths.extend([
-            cache_home / "google-chrome",
-            cache_home / "chromium",
-            cache_home / "mozilla" / "firefox",
-            cache_home / "microsoft-edge",
-            config_home / "google-chrome",
-            config_home / "chromium",
-            config_home / "microsoft-edge",
-        ])
-
-        # WSL: Also include Windows browser caches
-        if info.is_wsl and info.windows_home:
-            lap = info.windows_home / "AppData" / "Local"
-            paths.extend([
-                lap / "Google" / "Chrome" / "User Data" / "Default" / "Cache",
-                lap / "Microsoft" / "Edge" / "User Data" / "Default" / "Cache",
-            ])
+        paths = _get_linux_browser_cache_paths(
+            XdgPaths.from_environ(info.home_dir),
+            is_wsl=info.is_wsl,
+            windows_home=info.windows_home,
+        )
+    else:
+        paths = []
 
     return [p for p in paths if p.exists()]
 
 
+def _get_cross_platform_package_manager_paths(home_dir: Path) -> list[Path]:
+    """Get cross-platform package manager cache locations."""
+    return [
+        home_dir / ".npm",
+        home_dir / ".yarn",
+        home_dir / ".pnpm-store",
+        home_dir / ".cargo" / "registry",
+        home_dir / ".cargo" / "git",
+        home_dir / ".m2" / "repository",
+        home_dir / ".gradle" / "caches",
+        home_dir / "go" / "pkg" / "mod" / "cache",
+        home_dir / ".composer" / "cache",
+        home_dir / ".nuget" / "packages",
+        home_dir / ".bundle" / "cache",
+    ]
+
+
+def _get_windows_package_manager_cache_paths(win_paths: WindowsEnvPaths) -> list[Path]:
+    """Get Windows-specific package manager cache locations."""
+    paths: list[Path] = []
+    if win_paths.local_app_data:
+        lap = win_paths.local_app_data
+        paths.extend([
+            lap / "pip" / "cache",
+            lap / "npm-cache",
+            lap / "yarn" / "Cache",
+            lap / "pnpm" / "store",
+            lap / "NuGet" / "Cache",
+        ])
+    return paths
+
+
+def _get_linux_unix_package_manager_cache_paths(xdg: XdgPaths) -> list[Path]:
+    """Get Linux/Unix-specific package manager cache locations."""
+    return [
+        xdg.cache_home / "pip",
+        xdg.cache_home / "go-build",
+        xdg.cache_home / "composer",
+    ]
+
+
 def _get_package_manager_cache_paths(info: PlatformInfo) -> list[Path]:
     """Get package manager cache locations."""
-    paths: list[Path] = []
+    # Start with cross-platform locations
+    paths = _get_cross_platform_package_manager_paths(info.home_dir)
 
-    # Cross-platform locations
-    paths.extend([
-        info.home_dir / ".npm",
-        info.home_dir / ".yarn",
-        info.home_dir / ".pnpm-store",
-        info.home_dir / ".cargo" / "registry",
-        info.home_dir / ".cargo" / "git",
-        info.home_dir / ".m2" / "repository",
-        info.home_dir / ".gradle" / "caches",
-        info.home_dir / "go" / "pkg" / "mod" / "cache",
-        info.home_dir / ".composer" / "cache",
-        info.home_dir / ".nuget" / "packages",
-        info.home_dir / ".bundle" / "cache",
-    ])
-
+    # Add platform-specific locations
     if info.name == "Windows":
-        local_app_data = os.environ.get("LOCALAPPDATA")
-        if local_app_data:
-            lap = Path(local_app_data)
-            paths.extend([
-                lap / "pip" / "cache",
-                lap / "npm-cache",
-                lap / "yarn" / "Cache",
-                lap / "pnpm" / "store",
-                lap / "NuGet" / "Cache",
-            ])
+        paths.extend(_get_windows_package_manager_cache_paths(WindowsEnvPaths.from_environ()))
     else:
-        cache_home = Path(os.environ.get("XDG_CACHE_HOME") or (info.home_dir / ".cache"))
-        paths.extend([
-            cache_home / "pip",
-            cache_home / "go-build",
-            cache_home / "composer",
-        ])
+        paths.extend(_get_linux_unix_package_manager_cache_paths(XdgPaths.from_environ(info.home_dir)))
 
     return [p for p in paths if p.exists()]
 
@@ -282,9 +370,9 @@ def _get_app_cache_paths(info: PlatformInfo) -> list[Path]:
     paths: list[Path] = []
 
     if info.name == "Windows":
-        local_app_data = os.environ.get("LOCALAPPDATA")
-        if local_app_data:
-            lap = Path(local_app_data)
+        win_paths = WindowsEnvPaths.from_environ()
+        if win_paths.local_app_data:
+            lap = win_paths.local_app_data
             paths.extend([
                 lap / "Programs" / "Microsoft VS Code" / "Cache",
                 lap / "Slack" / "Cache",
@@ -303,19 +391,18 @@ def _get_app_cache_paths(info: PlatformInfo) -> list[Path]:
         ])
 
     elif info.name == "Linux":
-        cache_home = Path(os.environ.get("XDG_CACHE_HOME") or (info.home_dir / ".cache"))
-        config_home = Path(os.environ.get("XDG_CONFIG_HOME") or (info.home_dir / ".config"))
+        xdg = XdgPaths.from_environ(info.home_dir)
         paths.extend([
-            config_home / "Code" / "Cache",
-            config_home / "Code" / "CachedData",
-            cache_home / "Slack",
-            config_home / "discord" / "Cache",
-            cache_home / "spotify",
-            config_home / "Microsoft" / "Microsoft Teams" / "Cache",
-            cache_home / "thumbnails",
-            cache_home / "fontconfig",
-            cache_home / "mesa_shader_cache",
-            cache_home / "nvidia",
+            xdg.config_home / "Code" / "Cache",
+            xdg.config_home / "Code" / "CachedData",
+            xdg.cache_home / "Slack",
+            xdg.config_home / "discord" / "Cache",
+            xdg.cache_home / "spotify",
+            xdg.config_home / "Microsoft" / "Microsoft Teams" / "Cache",
+            xdg.cache_home / "thumbnails",
+            xdg.cache_home / "fontconfig",
+            xdg.cache_home / "mesa_shader_cache",
+            xdg.cache_home / "nvidia",
         ])
 
     return [p for p in paths if p.exists()]
