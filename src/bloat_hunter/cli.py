@@ -232,6 +232,124 @@ def duplicates(
 
 
 @app.command()
+def caches(
+    dry_run: bool = typer.Option(
+        True,
+        "--dry-run/--execute",
+        help="Preview changes without deleting (default: dry-run)",
+    ),
+    trash: bool = typer.Option(
+        True,
+        "--trash/--permanent",
+        help="Move to trash instead of permanent deletion (default: trash)",
+    ),
+    interactive: bool = typer.Option(
+        True,
+        "--interactive/--auto",
+        help="Interactively select what to delete (default: interactive)",
+    ),
+    browsers: bool = typer.Option(
+        True,
+        "--browsers/--no-browsers",
+        help="Include browser caches (Chrome, Firefox, Edge, Safari)",
+    ),
+    packages: bool = typer.Option(
+        True,
+        "--packages/--no-packages",
+        help="Include package manager caches (npm, pip, cargo, etc.)",
+    ),
+    apps: bool = typer.Option(
+        True,
+        "--apps/--no-apps",
+        help="Include application caches (VS Code, Slack, Discord, etc.)",
+    ),
+    wsl_windows: bool = typer.Option(
+        True,
+        "--wsl-windows/--wsl-linux-only",
+        help="When in WSL, also scan Windows cache directories",
+    ),
+    show_all: bool = typer.Option(
+        False,
+        "--all",
+        "-a",
+        help="Show all findings, not just top offenders",
+    ),
+) -> None:
+    """Scan and clean system cache directories (browsers, package managers, apps)."""
+    print_banner(console)
+
+    platform_info = get_platform_info()
+    console.print(f"[dim]Platform: {platform_info.name} ({platform_info.variant})[/dim]")
+
+    if platform_info.is_wsl:
+        wsl_status = "Included" if wsl_windows else "Excluded"
+        console.print(f"[dim]WSL Windows caches: {wsl_status}[/dim]")
+
+    console.print()
+
+    # Import here to avoid circular imports
+    from bloat_hunter.core.cache_scanner import CacheScanner
+    from bloat_hunter.core.scanner import ScanResult
+
+    scanner = CacheScanner(
+        console=console,
+        include_browsers=browsers,
+        include_package_managers=packages,
+        include_apps=apps,
+    )
+
+    results = scanner.scan(wsl_include_windows=wsl_windows)
+
+    # Convert to standard ScanResult for display compatibility
+    display_result = ScanResult(
+        root_path=platform_info.home_dir,
+        targets=results.targets,
+        total_size=results.total_size,
+        scan_errors=results.scan_errors,
+    )
+
+    analyzer = Analyzer(console=console)
+    analyzer.display_results(display_result, show_all=show_all)
+
+    # Show category breakdown
+    if results.categories_scanned:
+        console.print("\n[bold]Categories scanned:[/bold]")
+        for cat, count in results.categories_scanned.items():
+            cat_label = cat.replace("_", " ").title()
+            console.print(f"  - {cat_label}: {count} locations")
+
+    if not results.targets:
+        console.print("[green]No cache bloat found![/green]")
+        raise typer.Exit(0)
+
+    # Interactive selection or auto-select all
+    if interactive:
+        selected = select_targets(results.targets)
+        if not selected:
+            console.print("[yellow]No targets selected. Exiting.[/yellow]")
+            raise typer.Exit(0)
+    else:
+        selected = results.targets
+
+    # Show what will be deleted
+    analyzer.display_deletion_preview(selected)
+
+    if dry_run:
+        console.print("\n[yellow]Dry run mode - no files were deleted.[/yellow]")
+        console.print("[dim]Use --execute to actually delete files.[/dim]")
+        raise typer.Exit(0)
+
+    # Confirm before deletion
+    if not confirm_deletion(len(selected)):
+        console.print("[yellow]Aborted.[/yellow]")
+        raise typer.Exit(0)
+
+    # Perform cleanup
+    cleaner = Cleaner(console=console, use_trash=trash)
+    cleaner.clean(selected)
+
+
+@app.command()
 def info() -> None:
     """Show system and platform information."""
     print_banner(console)

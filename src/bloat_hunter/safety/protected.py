@@ -143,17 +143,40 @@ def is_protected_path(path: Path, for_scanning: bool = False) -> bool:
 def _is_cache_subdirectory(path: Path) -> bool:
     """Check if this is a cache directory that's safe to delete."""
     cache_names = {
+        # Python
         "__pycache__",
         ".pytest_cache",
         ".mypy_cache",
         ".ruff_cache",
+        ".tox",
+        ".nox",
+        # Node.js
         "node_modules",
         ".next",
         ".nuxt",
-        ".cache",
         ".parcel-cache",
-        ".tox",
-        ".nox",
+        # Generic
+        ".cache",
+        # Browser caches
+        "Cache",
+        "Code Cache",
+        "GPUCache",
+        "ShaderCache",
+        "GrShaderCache",
+        "Media Cache",
+        "cache2",
+        "startupCache",
+        # Package manager caches
+        "_cacache",
+        "_npx",
+        "go-build",
+        # App caches
+        "CachedData",
+        "CachedExtensions",
+        "thumbnails",
+        "fontconfig",
+        "Crashpad",
+        "blob_storage",
     }
     return path.name in cache_names
 
