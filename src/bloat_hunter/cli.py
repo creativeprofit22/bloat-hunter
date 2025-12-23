@@ -62,6 +62,15 @@ def _print_dry_run_notice() -> None:
     console.print("[dim]Use --execute to actually delete files.[/dim]")
 
 
+def _parse_min_size(min_size: str) -> int:
+    """Parse min_size string to bytes, exit with error on invalid input."""
+    try:
+        return parse_size(min_size)
+    except ValueError as e:
+        console.print(f"[red]Invalid min-size: {e}[/red]")
+        raise typer.Exit(1) from e
+
+
 def _print_config_locations(xdg_path: Path, cwd_path: Path, *, verbose: bool = False) -> None:
     """Print config file locations and their status.
 
@@ -273,12 +282,7 @@ def scan(
     """Scan a directory for bloat and caches."""
     print_banner(console)
 
-    # Parse min_size
-    try:
-        min_size_bytes = parse_size(min_size)
-    except ValueError as e:
-        console.print(f"[red]Invalid min-size: {e}[/red]")
-        raise typer.Exit(1) from e
+    min_size_bytes = _parse_min_size(min_size)
 
     _print_platform_header()
     if min_size_bytes > 0:
@@ -315,12 +319,7 @@ def clean(
     """Clean up bloat and caches from a directory."""
     print_banner(console)
 
-    # Parse min_size
-    try:
-        min_size_bytes = parse_size(min_size)
-    except ValueError as e:
-        console.print(f"[red]Invalid min-size: {e}[/red]")
-        raise typer.Exit(1) from e
+    min_size_bytes = _parse_min_size(min_size)
 
     if min_size_bytes > 0:
         console.print(f"[dim]Minimum size: {min_size}[/dim]")
@@ -385,12 +384,7 @@ def duplicates(
 
     keep_strategy = cast(KeepStrategy, keep)
 
-    # Parse min_size
-    try:
-        min_size_bytes = parse_size(min_size)
-    except ValueError as e:
-        console.print(f"[red]Invalid min-size: {e}[/red]")
-        raise typer.Exit(1) from e
+    min_size_bytes = _parse_min_size(min_size)
 
     _print_platform_header()
     console.print(f"[dim]Minimum file size: {min_size}[/dim]")

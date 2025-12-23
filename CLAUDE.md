@@ -3,12 +3,15 @@
 Cross-platform disk cleanup CLI tool.
 
 ## Current Focus
-Feature complete - awaiting next task
+Section: Size thresholds CLI
+Files: src/bloat_hunter/core/scanner.py, src/bloat_hunter/cli.py, src/bloat_hunter/config.py
 
 ## Pipeline State
 Phase: build
 Feature: Size thresholds CLI
-Status: complete
+Reports:
+  - bugs: reports/bugs-size-thresholds-cli.md
+  - refactors: reports/refactors-size-thresholds-cli.md
 
 ## Feature Backlog
 High Priority:
@@ -37,12 +40,10 @@ bloat-hunter config show
 ```
 
 ## Last Session (2025-12-22)
-Size thresholds CLI feature complete:
-- Added `--min-size` option to `scan` and `clean` commands
-- Updated Scanner class to accept min_size parameter
-- Added min_size to ScanConfig for config file support
-- Added tests for parse_size and min_size filtering
-- All 158 tests passed
+Size thresholds CLI - refactoring complete:
+- Extracted `_parse_min_size` helper in cli.py:65-71
+- Replaced 3 duplicated blocks (scan, clean, duplicates commands)
+- Low priority items skipped (intentional differences)
 
 ## Next Steps
 1. Pick next feature from backlog (Export results or Parallel scanning)
