@@ -12,6 +12,7 @@ from rich.table import Table
 from bloat_hunter import __version__
 from bloat_hunter.config import (
     DEFAULT_CONFIG_TEMPLATE,
+    VALID_KEEP_STRATEGIES,
     Config,
     get_config_paths,
     load_config,
@@ -23,7 +24,7 @@ from bloat_hunter.core.cleaner import Cleaner
 from bloat_hunter.core.duplicates import DuplicateGroup, DuplicateScanner, KeepStrategy
 from bloat_hunter.core.package_scanner import PackageManagerConfig, PackageScanner
 from bloat_hunter.core.scanner import BloatTarget, Scanner, ScanResult, parse_size
-from bloat_hunter.platform.detect import get_platform_info
+from bloat_hunter.platform.detect import PlatformInfo, get_platform_info
 from bloat_hunter.ui.console import create_console, print_banner
 from bloat_hunter.ui.prompts import confirm_deletion, select_duplicate_groups, select_targets
 
@@ -44,8 +45,56 @@ class State:
 
 state = State()
 
-# Valid keep strategies for duplicate file selection
-VALID_KEEP_STRATEGIES: tuple[KeepStrategy, ...] = ("first", "shortest", "oldest", "newest")
+
+def _print_platform_header(wsl_windows: bool | None = None) -> PlatformInfo:
+    """Print platform header and optionally WSL status. Returns platform_info for further use."""
+    platform_info = get_platform_info()
+    console.print(f"[dim]Platform: {platform_info.name} ({platform_info.variant})[/dim]")
+    if wsl_windows is not None and platform_info.is_wsl:
+        wsl_status = "Included" if wsl_windows else "Excluded"
+        console.print(f"[dim]WSL Windows caches: {wsl_status}[/dim]")
+    return platform_info
+
+
+def _print_dry_run_notice() -> None:
+    """Print dry run mode notice and instructions."""
+    console.print("\n[yellow]Dry run mode - no files were deleted.[/yellow]")
+    console.print("[dim]Use --execute to actually delete files.[/dim]")
+
+
+def _print_config_locations(xdg_path: Path, cwd_path: Path, *, verbose: bool = False) -> None:
+    """Print config file locations and their status.
+
+    Args:
+        xdg_path: Path to the global XDG config file.
+        cwd_path: Path to the local CWD config file.
+        verbose: If True, use detailed format with spacing (for config_path).
+                 If False, use compact format (for config_show).
+    """
+    if verbose:
+        console.print("[bold]Config file locations:[/bold]\n")
+
+        # XDG location
+        xdg_status = "[green]exists[/green]" if xdg_path.exists() else "[dim]not found[/dim]"
+        console.print(f"  Global (XDG): {xdg_path}")
+        console.print(f"                {xdg_status}\n")
+
+        # CWD location
+        cwd_status = (
+            "[green]exists (overrides global)[/green]"
+            if cwd_path.exists()
+            else "[dim]not found[/dim]"
+        )
+        console.print(f"  Local (CWD):  {cwd_path}")
+        console.print(f"                {cwd_status}")
+    else:
+        console.print("\n[bold]Config locations:[/bold]")
+        xdg_status = "[green]exists[/green]" if xdg_path.exists() else "[dim]not found[/dim]"
+        console.print(f"  Global: {xdg_path} ({xdg_status})")
+
+        cwd_status = "[green]exists[/green]" if cwd_path.exists() else "[dim]not found[/dim]"
+        console.print(f"  Local:  {cwd_path} ({cwd_status})")
+
 
 # Shared CLI option defaults to avoid repetition (DRY principle)
 DRY_RUN_OPTION = typer.Option(
@@ -67,6 +116,99 @@ INTERACTIVE_OPTION = typer.Option(
 )
 
 
+def _handle_targets_cleanup(
+    targets: list[BloatTarget],
+    analyzer: Analyzer,
+    dry_run: bool,
+    interactive: bool,
+    trash: bool,
+) -> None:
+    """Handle cleanup flow for regular scan targets (clean, caches, packages).
+
+    Args:
+        targets: List of scan targets to clean.
+        analyzer: Analyzer instance for displaying previews.
+        dry_run: If True, only preview without deleting.
+        interactive: If True, allow user to select items.
+        trash: If True, move to trash instead of permanent deletion.
+
+    Raises:
+        typer.Exit: On completion, abortion, or when no items selected.
+    """
+    # Interactive selection or auto-select all
+    if interactive:
+        selected_targets = select_targets(targets)
+        if not selected_targets:
+            console.print("[yellow]No targets selected. Exiting.[/yellow]")
+            raise typer.Exit(0)
+    else:
+        selected_targets = targets
+
+    # Show what will be deleted
+    analyzer.display_deletion_preview(selected_targets)
+
+    if dry_run:
+        _print_dry_run_notice()
+        raise typer.Exit(0)
+
+    # Confirm before deletion
+    if not confirm_deletion(len(selected_targets)):
+        console.print("[yellow]Aborted.[/yellow]")
+        raise typer.Exit(0)
+
+    # Perform cleanup
+    cleaner = Cleaner(console=console, use_trash=trash)
+    cleaner.clean(selected_targets)
+
+
+def _handle_duplicates_cleanup(
+    groups: list[DuplicateGroup],
+    analyzer: Analyzer,
+    dry_run: bool,
+    interactive: bool,
+    trash: bool,
+    keep_strategy: KeepStrategy,
+) -> None:
+    """Handle cleanup flow for duplicate file groups.
+
+    Args:
+        groups: List of duplicate groups to clean.
+        analyzer: Analyzer instance for displaying previews.
+        dry_run: If True, only preview without deleting.
+        interactive: If True, allow user to select items.
+        trash: If True, move to trash instead of permanent deletion.
+        keep_strategy: Strategy for keeping files in duplicate groups.
+
+    Raises:
+        typer.Exit: On completion, abortion, or when no items selected.
+    """
+    # Interactive selection or auto-select all
+    if interactive:
+        selected_groups = select_duplicate_groups(groups)
+        if not selected_groups:
+            console.print("[yellow]No groups selected. Exiting.[/yellow]")
+            raise typer.Exit(0)
+    else:
+        selected_groups = groups
+
+    # Show what will be deleted
+    analyzer.display_duplicate_deletion_preview(selected_groups, keep_strategy)
+
+    if dry_run:
+        _print_dry_run_notice()
+        raise typer.Exit(0)
+
+    # Confirm before deletion
+    total_to_delete = sum(g.duplicate_count for g in selected_groups)
+    if not confirm_deletion(total_to_delete):
+        console.print("[yellow]Aborted.[/yellow]")
+        raise typer.Exit(0)
+
+    # Perform cleanup
+    cleaner = Cleaner(console=console, use_trash=trash)
+    cleaner.clean_duplicates(selected_groups, keep_strategy)
+
+
 def _handle_cleanup_flow(
     targets: list[BloatTarget] | None = None,
     groups: list[DuplicateGroup] | None = None,
@@ -77,7 +219,7 @@ def _handle_cleanup_flow(
     trash: bool,
     keep_strategy: KeepStrategy | None = None,
 ) -> None:
-    """Handle the common select -> preview -> dry-run -> confirm -> clean flow.
+    """Dispatcher for cleanup flows - routes to targets or duplicates handler.
 
     Args:
         targets: List of scan targets for regular cleanup (clean, caches, packages).
@@ -91,64 +233,12 @@ def _handle_cleanup_flow(
     Raises:
         typer.Exit: On completion, abortion, or when no items selected.
     """
-    is_duplicates = groups is not None
-
-    if is_duplicates:
-        assert groups is not None  # Type narrowing for mypy
-        # Interactive selection or auto-select all
-        if interactive:
-            selected_groups = select_duplicate_groups(groups)
-            if not selected_groups:
-                console.print("[yellow]No groups selected. Exiting.[/yellow]")
-                raise typer.Exit(0)
-        else:
-            selected_groups = groups
-
-        # Show what will be deleted
-        assert keep_strategy is not None
-        analyzer.display_duplicate_deletion_preview(selected_groups, keep_strategy)
-
-        if dry_run:
-            console.print("\n[yellow]Dry run mode - no files were deleted.[/yellow]")
-            console.print("[dim]Use --execute to actually delete files.[/dim]")
-            raise typer.Exit(0)
-
-        # Confirm before deletion
-        total_to_delete = sum(g.duplicate_count for g in selected_groups)
-        if not confirm_deletion(total_to_delete):
-            console.print("[yellow]Aborted.[/yellow]")
-            raise typer.Exit(0)
-
-        # Perform cleanup
-        cleaner = Cleaner(console=console, use_trash=trash)
-        cleaner.clean_duplicates(selected_groups, keep_strategy)
+    if groups is not None:
+        assert keep_strategy is not None  # Required for duplicates
+        _handle_duplicates_cleanup(groups, analyzer, dry_run, interactive, trash, keep_strategy)
     else:
-        assert targets is not None  # Type narrowing for mypy
-        # Interactive selection or auto-select all
-        if interactive:
-            selected_targets = select_targets(targets)
-            if not selected_targets:
-                console.print("[yellow]No targets selected. Exiting.[/yellow]")
-                raise typer.Exit(0)
-        else:
-            selected_targets = targets
-
-        # Show what will be deleted
-        analyzer.display_deletion_preview(selected_targets)
-
-        if dry_run:
-            console.print("\n[yellow]Dry run mode - no files were deleted.[/yellow]")
-            console.print("[dim]Use --execute to actually delete files.[/dim]")
-            raise typer.Exit(0)
-
-        # Confirm before deletion
-        if not confirm_deletion(len(selected_targets)):
-            console.print("[yellow]Aborted.[/yellow]")
-            raise typer.Exit(0)
-
-        # Perform cleanup
-        cleaner = Cleaner(console=console, use_trash=trash)
-        cleaner.clean(selected_targets)
+        assert targets is not None  # Must have either targets or groups
+        _handle_targets_cleanup(targets, analyzer, dry_run, interactive, trash)
 
 
 @app.command()
@@ -176,9 +266,8 @@ def scan(
 ) -> None:
     """Scan a directory for bloat and caches."""
     print_banner(console)
-
-    platform_info = get_platform_info()
-    console.print(f"[dim]Platform: {platform_info.name} ({platform_info.variant})[/dim]\n")
+    _print_platform_header()
+    console.print()
 
     scanner = Scanner(console=console)
     results = scanner.scan(path, deep=deep)
@@ -271,9 +360,9 @@ def duplicates(
         console.print(f"[red]Invalid min-size: {e}[/red]")
         raise typer.Exit(1) from e
 
-    platform_info = get_platform_info()
-    console.print(f"[dim]Platform: {platform_info.name} ({platform_info.variant})[/dim]")
-    console.print(f"[dim]Minimum file size: {min_size}[/dim]\n")
+    _print_platform_header()
+    console.print(f"[dim]Minimum file size: {min_size}[/dim]")
+    console.print()
 
     # Scan for duplicates
     scanner = DuplicateScanner(console=console, min_size=min_size_bytes)
@@ -330,14 +419,7 @@ def caches(
 ) -> None:
     """Scan and clean system cache directories (browsers, package managers, apps)."""
     print_banner(console)
-
-    platform_info = get_platform_info()
-    console.print(f"[dim]Platform: {platform_info.name} ({platform_info.variant})[/dim]")
-
-    if platform_info.is_wsl:
-        wsl_status = "Included" if wsl_windows else "Excluded"
-        console.print(f"[dim]WSL Windows caches: {wsl_status}[/dim]")
-
+    platform_info = _print_platform_header(wsl_windows=wsl_windows)
     console.print()
 
     scanner = CacheScanner(
@@ -410,14 +492,7 @@ def packages(
 ) -> None:
     """Scan and clean package manager caches (npm, pip, cargo, etc.)."""
     print_banner(console)
-
-    platform_info = get_platform_info()
-    console.print(f"[dim]Platform: {platform_info.name} ({platform_info.variant})[/dim]")
-
-    if platform_info.is_wsl:
-        wsl_status = "Included" if wsl_windows else "Excluded"
-        console.print(f"[dim]WSL Windows caches: {wsl_status}[/dim]")
-
+    _print_platform_header(wsl_windows=wsl_windows)
     console.print()
 
     config = PackageManagerConfig(
@@ -560,34 +635,14 @@ def config_show(
             console.print("[dim]No config file found[/dim]")
 
     # Show search locations
-    console.print("\n[bold]Config locations:[/bold]")
-    xdg_status = "[green]exists[/green]" if xdg_path.exists() else "[dim]not found[/dim]"
-    console.print(f"  Global: {xdg_path} ({xdg_status})")
-
-    cwd_status = "[green]exists[/green]" if cwd_path.exists() else "[dim]not found[/dim]"
-    console.print(f"  Local:  {cwd_path} ({cwd_status})")
+    _print_config_locations(xdg_path, cwd_path, verbose=False)
 
 
 @config_app.command("path")
 def config_path() -> None:
     """Show configuration file locations and status."""
     xdg_path, cwd_path = get_config_paths()
-
-    console.print("[bold]Config file locations:[/bold]\n")
-
-    # XDG location
-    xdg_status = "[green]exists[/green]" if xdg_path.exists() else "[dim]not found[/dim]"
-    console.print(f"  Global (XDG): {xdg_path}")
-    console.print(f"                {xdg_status}\n")
-
-    # CWD location
-    cwd_status = (
-        "[green]exists (overrides global)[/green]"
-        if cwd_path.exists()
-        else "[dim]not found[/dim]"
-    )
-    console.print(f"  Local (CWD):  {cwd_path}")
-    console.print(f"                {cwd_status}")
+    _print_config_locations(xdg_path, cwd_path, verbose=True)
 
 
 @app.callback()

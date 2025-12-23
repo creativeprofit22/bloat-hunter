@@ -161,16 +161,23 @@ def _filter_known_keys(data: dict[str, Any], dataclass_type: type) -> dict[str, 
     return {k: v for k, v in data.items() if k in valid_fields}
 
 
+# Mapping of section names to their config classes
+SECTION_TYPES = {
+    "defaults": DefaultsConfig,
+    "packages": PackagesConfig,
+    "caches": CachesConfig,
+    "duplicates": DuplicatesConfig,
+    "scan": ScanConfig,
+}
+
+
 def _dict_to_config(data: dict[str, Any], source: Path | None = None) -> Config:
     """Convert parsed TOML dict to Config dataclass."""
-    return Config(
-        defaults=DefaultsConfig(**_filter_known_keys(data.get("defaults", {}), DefaultsConfig)),
-        packages=PackagesConfig(**_filter_known_keys(data.get("packages", {}), PackagesConfig)),
-        caches=CachesConfig(**_filter_known_keys(data.get("caches", {}), CachesConfig)),
-        duplicates=DuplicatesConfig(**_filter_known_keys(data.get("duplicates", {}), DuplicatesConfig)),
-        scan=ScanConfig(**_filter_known_keys(data.get("scan", {}), ScanConfig)),
-        _source=source,
-    )
+    sections = {
+        name: cls(**_filter_known_keys(data.get(name, {}), cls))
+        for name, cls in SECTION_TYPES.items()
+    }
+    return Config(**sections, _source=source)
 
 
 def load_config() -> Config:
