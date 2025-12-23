@@ -263,13 +263,29 @@ def scan(
         "-a",
         help="Show all findings, not just top offenders",
     ),
+    min_size: str = typer.Option(
+        "0B",
+        "--min-size",
+        "-s",
+        help="Minimum size to report (e.g., 1MB, 10MB, 100MB)",
+    ),
 ) -> None:
     """Scan a directory for bloat and caches."""
     print_banner(console)
+
+    # Parse min_size
+    try:
+        min_size_bytes = parse_size(min_size)
+    except ValueError as e:
+        console.print(f"[red]Invalid min-size: {e}[/red]")
+        raise typer.Exit(1) from e
+
     _print_platform_header()
+    if min_size_bytes > 0:
+        console.print(f"[dim]Minimum size: {min_size}[/dim]")
     console.print()
 
-    scanner = Scanner(console=console)
+    scanner = Scanner(console=console, min_size=min_size_bytes)
     results = scanner.scan(path, deep=deep)
 
     analyzer = Analyzer(console=console)
@@ -289,11 +305,27 @@ def clean(
     dry_run: bool = DRY_RUN_OPTION,
     trash: bool = TRASH_OPTION,
     interactive: bool = INTERACTIVE_OPTION,
+    min_size: str = typer.Option(
+        "0B",
+        "--min-size",
+        "-s",
+        help="Minimum size to report (e.g., 1MB, 10MB, 100MB)",
+    ),
 ) -> None:
     """Clean up bloat and caches from a directory."""
     print_banner(console)
 
-    scanner = Scanner(console=console)
+    # Parse min_size
+    try:
+        min_size_bytes = parse_size(min_size)
+    except ValueError as e:
+        console.print(f"[red]Invalid min-size: {e}[/red]")
+        raise typer.Exit(1) from e
+
+    if min_size_bytes > 0:
+        console.print(f"[dim]Minimum size: {min_size}[/dim]")
+
+    scanner = Scanner(console=console, min_size=min_size_bytes)
     results = scanner.scan(path, deep=True)
 
     if not results.targets:

@@ -131,9 +131,10 @@ def get_directory_size(path: Path) -> tuple[int, int]:
 class Scanner:
     """Scans directories for bloat and caches."""
 
-    def __init__(self, console: Optional[Console] = None):
+    def __init__(self, console: Optional[Console] = None, min_size: int = 0):
         self.console = console or Console()
         self.patterns = get_all_patterns()
+        self.min_size = min_size
 
     def scan(self, root: Path, deep: bool = False) -> ScanResult:
         """
@@ -196,8 +197,8 @@ class Scanner:
                     if matched_pattern:
                         # Found bloat - calculate size and add to results
                         size, count = get_directory_size(entry_path)
-                        # Only add if size meets minimum threshold
-                        if size > 0 and size >= matched_pattern.min_size:
+                        # Only add if size meets minimum thresholds (pattern + user)
+                        if size > 0 and size >= matched_pattern.min_size and size >= self.min_size:
                             target = BloatTarget(
                                 path=entry_path,
                                 pattern=matched_pattern,

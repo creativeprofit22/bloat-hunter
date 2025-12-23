@@ -79,6 +79,15 @@ class ScanConfig:
 
     show_all: bool = False
     deep: bool = False
+    min_size: str = "0B"
+
+    @property
+    def min_size_bytes(self) -> int:
+        """Convert min_size to bytes."""
+        try:
+            return parse_size(self.min_size)
+        except ValueError:
+            return 0  # No filter fallback
 
 
 @dataclass
@@ -144,13 +153,21 @@ def _validate_config(data: dict[str, Any]) -> list[str]:
             f"Invalid duplicates.keep: '{keep}' (use: first, shortest, oldest, newest)"
         )
 
-    # Check min_size format
+    # Check min_size format for duplicates
     min_size = data.get("duplicates", {}).get("min_size")
     if min_size:
         try:
             parse_size(min_size)
         except ValueError:
             errors.append(f"Invalid duplicates.min_size: '{min_size}' (use: 1KB, 10MB, 1GB)")
+
+    # Check min_size format for scan
+    scan_min_size = data.get("scan", {}).get("min_size")
+    if scan_min_size:
+        try:
+            parse_size(scan_min_size)
+        except ValueError:
+            errors.append(f"Invalid scan.min_size: '{scan_min_size}' (use: 1KB, 10MB, 1GB)")
 
     return errors
 
@@ -278,4 +295,5 @@ keep = "first"          # Which to keep: first, shortest, oldest, newest
 # General scan behavior (bloat-hunter scan)
 show_all = false        # Show all vs top offenders
 deep = false            # Deep scan (slower but thorough)
+min_size = "0B"         # Minimum size filter: 1KB, 10MB, 1GB, etc.
 """

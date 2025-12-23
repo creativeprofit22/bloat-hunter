@@ -94,6 +94,15 @@ class TestScanConfig:
         config = ScanConfig()
         assert config.show_all is False
         assert config.deep is False
+        assert config.min_size == "0B"
+
+    def test_min_size_bytes_property(self):
+        config = ScanConfig(min_size="10MB")
+        assert config.min_size_bytes == 10 * 1024 * 1024
+
+    def test_min_size_bytes_zero_default(self):
+        config = ScanConfig()
+        assert config.min_size_bytes == 0
 
 
 class TestConfig:
@@ -153,6 +162,17 @@ class TestValidateConfig:
         errors = _validate_config(data)
         assert len(errors) == 1
         assert "duplicates.min_size" in errors[0]
+
+    def test_invalid_scan_min_size(self):
+        data = {"scan": {"min_size": "invalid"}}
+        errors = _validate_config(data)
+        assert len(errors) == 1
+        assert "scan.min_size" in errors[0]
+
+    def test_valid_scan_min_size(self):
+        data = {"scan": {"min_size": "100MB"}}
+        errors = _validate_config(data)
+        assert errors == []
 
 
 class TestDictToConfig:

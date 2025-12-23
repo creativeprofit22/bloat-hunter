@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from bloat_hunter.core.scanner import Scanner, get_directory_size, format_size
+from bloat_hunter.core.scanner import Scanner, get_directory_size, format_size, parse_size
 
 
 class TestFormatSize:
@@ -85,3 +85,64 @@ class TestScanner:
         if len(result.targets) > 1:
             sizes = [t.size_bytes for t in result.targets]
             assert sizes == sorted(sizes, reverse=True)
+
+    def test_scan_with_min_size_filters_small_targets(self, mock_project: Path):
+        """Test that min_size parameter filters out small targets."""
+        # First scan without filter to verify we find targets
+        scanner_no_filter = Scanner()
+        result_no_filter = scanner_no_filter.scan(mock_project)
+        assert len(result_no_filter.targets) > 0
+
+        # Now scan with a very large min_size filter
+        scanner_with_filter = Scanner(min_size=1024 * 1024 * 1024)  # 1GB
+        result_with_filter = scanner_with_filter.scan(mock_project)
+
+        # Large filter should exclude small targets
+        assert len(result_with_filter.targets) < len(result_no_filter.targets)
+
+    def test_scan_min_size_zero_includes_all(self, mock_project: Path):
+        """Test that min_size=0 includes all targets (default behavior)."""
+        scanner = Scanner(min_size=0)
+        result = scanner.scan(mock_project)
+
+        # Should find at least the node_modules target
+        assert len(result.targets) >= 1
+
+
+class TestParseSize:
+    """Tests for parse_size function."""
+
+    def test_parse_bytes(self):
+        assert parse_size("100") == 100
+        assert parse_size("100B") == 100
+        assert parse_size("100b") == 100
+
+    def test_parse_kilobytes(self):
+        assert parse_size("1KB") == 1024
+        assert parse_size("1kb") == 1024
+        assert parse_size("2KB") == 2048
+
+    def test_parse_megabytes(self):
+        assert parse_size("1MB") == 1024 * 1024
+        assert parse_size("10MB") == 10 * 1024 * 1024
+
+    def test_parse_gigabytes(self):
+        assert parse_size("1GB") == 1024 * 1024 * 1024
+
+    def test_parse_terabytes(self):
+        assert parse_size("1TB") == 1024 * 1024 * 1024 * 1024
+
+    def test_parse_decimal_values(self):
+        assert parse_size("1.5MB") == int(1.5 * 1024 * 1024)
+        assert parse_size("0.5GB") == int(0.5 * 1024 * 1024 * 1024)
+
+    def test_parse_with_whitespace(self):
+        assert parse_size("  10MB  ") == 10 * 1024 * 1024
+
+    def test_parse_invalid_raises_value_error(self):
+        with pytest.raises(ValueError):
+            parse_size("invalid")
+        with pytest.raises(ValueError):
+            parse_size("MB10")
+        with pytest.raises(ValueError):
+            parse_size("")
