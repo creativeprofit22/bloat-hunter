@@ -86,15 +86,20 @@ def parse_size(size_str: str) -> int:
         if size_str.endswith(unit):
             try:
                 value = float(size_str[: -len(unit)])
-                return int(value * multiplier)
             except ValueError:
                 raise ValueError(f"Invalid size value: {size_str}") from None
+            if value < 0:
+                raise ValueError(f"Size cannot be negative: {size_str}")
+            return int(value * multiplier)
 
     # No unit specified, assume bytes
     try:
-        return int(float(size_str))
+        value = float(size_str)
     except ValueError:
         raise ValueError(f"Invalid size string: {size_str}") from None
+    if value < 0:
+        raise ValueError(f"Size cannot be negative: {size_str}")
+    return int(value)
 
 
 def get_directory_size(path: Path) -> tuple[int, int]:

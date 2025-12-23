@@ -146,3 +146,11 @@ class TestParseSize:
             parse_size("MB10")
         with pytest.raises(ValueError):
             parse_size("")
+
+    def test_parse_negative_raises_value_error(self):
+        with pytest.raises(ValueError, match="cannot be negative"):
+            parse_size("-10MB")
+        with pytest.raises(ValueError, match="cannot be negative"):
+            parse_size("-100")
+        with pytest.raises(ValueError, match="cannot be negative"):
+            parse_size("-1.5GB")
