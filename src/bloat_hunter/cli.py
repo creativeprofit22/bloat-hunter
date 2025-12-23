@@ -3,19 +3,29 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import cast
 
 import typer
+from rich.panel import Panel
+from rich.table import Table
 
 from bloat_hunter import __version__
-from bloat_hunter.core.scanner import Scanner, ScanResult, parse_size
-from bloat_hunter.core.cache_scanner import CacheScanner
+from bloat_hunter.config import (
+    DEFAULT_CONFIG_TEMPLATE,
+    Config,
+    get_config_paths,
+    load_config,
+    load_config_from_file,
+)
 from bloat_hunter.core.analyzer import Analyzer
+from bloat_hunter.core.cache_scanner import CacheScanner
 from bloat_hunter.core.cleaner import Cleaner
-from bloat_hunter.core.duplicates import DuplicateScanner, KeepStrategy
+from bloat_hunter.core.duplicates import DuplicateGroup, DuplicateScanner, KeepStrategy
+from bloat_hunter.core.package_scanner import PackageManagerConfig, PackageScanner
+from bloat_hunter.core.scanner import BloatTarget, Scanner, ScanResult, parse_size
 from bloat_hunter.platform.detect import get_platform_info
 from bloat_hunter.ui.console import create_console, print_banner
-from bloat_hunter.ui.prompts import confirm_deletion, select_targets, select_duplicate_groups
+from bloat_hunter.ui.prompts import confirm_deletion, select_duplicate_groups, select_targets
 
 app = typer.Typer(
     name="bloat-hunter",
@@ -23,6 +33,16 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = create_console()
+
+
+class State:
+    """Global state container for CLI."""
+
+    def __init__(self) -> None:
+        self.config: Config = Config()  # Default until loaded
+
+
+state = State()
 
 # Valid keep strategies for duplicate file selection
 VALID_KEEP_STRATEGIES: tuple[KeepStrategy, ...] = ("first", "shortest", "oldest", "newest")
@@ -45,6 +65,90 @@ INTERACTIVE_OPTION = typer.Option(
     "--interactive/--auto",
     help="Interactively select what to delete (default: interactive)",
 )
+
+
+def _handle_cleanup_flow(
+    targets: list[BloatTarget] | None = None,
+    groups: list[DuplicateGroup] | None = None,
+    *,
+    analyzer: Analyzer,
+    dry_run: bool,
+    interactive: bool,
+    trash: bool,
+    keep_strategy: KeepStrategy | None = None,
+) -> None:
+    """Handle the common select -> preview -> dry-run -> confirm -> clean flow.
+
+    Args:
+        targets: List of scan targets for regular cleanup (clean, caches, packages).
+        groups: List of duplicate groups for duplicate cleanup.
+        analyzer: Analyzer instance for displaying previews.
+        dry_run: If True, only preview without deleting.
+        interactive: If True, allow user to select items.
+        trash: If True, move to trash instead of permanent deletion.
+        keep_strategy: Strategy for keeping files in duplicate groups (required for groups).
+
+    Raises:
+        typer.Exit: On completion, abortion, or when no items selected.
+    """
+    is_duplicates = groups is not None
+
+    if is_duplicates:
+        assert groups is not None  # Type narrowing for mypy
+        # Interactive selection or auto-select all
+        if interactive:
+            selected_groups = select_duplicate_groups(groups)
+            if not selected_groups:
+                console.print("[yellow]No groups selected. Exiting.[/yellow]")
+                raise typer.Exit(0)
+        else:
+            selected_groups = groups
+
+        # Show what will be deleted
+        assert keep_strategy is not None
+        analyzer.display_duplicate_deletion_preview(selected_groups, keep_strategy)
+
+        if dry_run:
+            console.print("\n[yellow]Dry run mode - no files were deleted.[/yellow]")
+            console.print("[dim]Use --execute to actually delete files.[/dim]")
+            raise typer.Exit(0)
+
+        # Confirm before deletion
+        total_to_delete = sum(g.duplicate_count for g in selected_groups)
+        if not confirm_deletion(total_to_delete):
+            console.print("[yellow]Aborted.[/yellow]")
+            raise typer.Exit(0)
+
+        # Perform cleanup
+        cleaner = Cleaner(console=console, use_trash=trash)
+        cleaner.clean_duplicates(selected_groups, keep_strategy)
+    else:
+        assert targets is not None  # Type narrowing for mypy
+        # Interactive selection or auto-select all
+        if interactive:
+            selected_targets = select_targets(targets)
+            if not selected_targets:
+                console.print("[yellow]No targets selected. Exiting.[/yellow]")
+                raise typer.Exit(0)
+        else:
+            selected_targets = targets
+
+        # Show what will be deleted
+        analyzer.display_deletion_preview(selected_targets)
+
+        if dry_run:
+            console.print("\n[yellow]Dry run mode - no files were deleted.[/yellow]")
+            console.print("[dim]Use --execute to actually delete files.[/dim]")
+            raise typer.Exit(0)
+
+        # Confirm before deletion
+        if not confirm_deletion(len(selected_targets)):
+            console.print("[yellow]Aborted.[/yellow]")
+            raise typer.Exit(0)
+
+        # Perform cleanup
+        cleaner = Cleaner(console=console, use_trash=trash)
+        cleaner.clean(selected_targets)
 
 
 @app.command()
@@ -107,32 +211,14 @@ def clean(
         console.print("[green]No bloat found! Your disk is clean.[/green]")
         raise typer.Exit(0)
 
-    # Interactive selection or auto-select all
-    if interactive:
-        selected = select_targets(results.targets)
-        if not selected:
-            console.print("[yellow]No targets selected. Exiting.[/yellow]")
-            raise typer.Exit(0)
-    else:
-        selected = results.targets
-
-    # Show what will be deleted
     analyzer = Analyzer(console=console)
-    analyzer.display_deletion_preview(selected)
-
-    if dry_run:
-        console.print("\n[yellow]Dry run mode - no files were deleted.[/yellow]")
-        console.print("[dim]Use --execute to actually delete files.[/dim]")
-        raise typer.Exit(0)
-
-    # Confirm before deletion
-    if not confirm_deletion(len(selected)):
-        console.print("[yellow]Aborted.[/yellow]")
-        raise typer.Exit(0)
-
-    # Perform cleanup
-    cleaner = Cleaner(console=console, use_trash=trash)
-    cleaner.clean(selected)
+    _handle_cleanup_flow(
+        targets=results.targets,
+        analyzer=analyzer,
+        dry_run=dry_run,
+        interactive=interactive,
+        trash=trash,
+    )
 
 
 @app.command()
@@ -176,14 +262,14 @@ def duplicates(
         console.print(f"[dim]Valid options: {', '.join(VALID_KEEP_STRATEGIES)}[/dim]")
         raise typer.Exit(1)
 
-    keep_strategy: KeepStrategy = keep  # type: ignore[assignment]
+    keep_strategy = cast(KeepStrategy, keep)
 
     # Parse min_size
     try:
         min_size_bytes = parse_size(min_size)
     except ValueError as e:
         console.print(f"[red]Invalid min-size: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
     platform_info = get_platform_info()
     console.print(f"[dim]Platform: {platform_info.name} ({platform_info.variant})[/dim]")
@@ -200,32 +286,14 @@ def duplicates(
     if not results.groups:
         raise typer.Exit(0)
 
-    # Interactive selection or auto-select all
-    if interactive:
-        selected = select_duplicate_groups(results.groups)
-        if not selected:
-            console.print("[yellow]No groups selected. Exiting.[/yellow]")
-            raise typer.Exit(0)
-    else:
-        selected = results.groups
-
-    # Show what will be deleted
-    analyzer.display_duplicate_deletion_preview(selected, keep_strategy)
-
-    if dry_run:
-        console.print("\n[yellow]Dry run mode - no files were deleted.[/yellow]")
-        console.print("[dim]Use --execute to actually delete files.[/dim]")
-        raise typer.Exit(0)
-
-    # Confirm before deletion
-    total_to_delete = sum(g.duplicate_count for g in selected)
-    if not confirm_deletion(total_to_delete):
-        console.print("[yellow]Aborted.[/yellow]")
-        raise typer.Exit(0)
-
-    # Perform cleanup
-    cleaner = Cleaner(console=console, use_trash=trash)
-    cleaner.clean_duplicates(selected, keep_strategy)
+    _handle_cleanup_flow(
+        groups=results.groups,
+        analyzer=analyzer,
+        dry_run=dry_run,
+        interactive=interactive,
+        trash=trash,
+        keep_strategy=keep_strategy,
+    )
 
 
 @app.command()
@@ -303,31 +371,86 @@ def caches(
         console.print("[green]No cache bloat found![/green]")
         raise typer.Exit(0)
 
-    # Interactive selection or auto-select all
-    if interactive:
-        selected = select_targets(results.targets)
-        if not selected:
-            console.print("[yellow]No targets selected. Exiting.[/yellow]")
-            raise typer.Exit(0)
-    else:
-        selected = results.targets
+    _handle_cleanup_flow(
+        targets=results.targets,
+        analyzer=analyzer,
+        dry_run=dry_run,
+        interactive=interactive,
+        trash=trash,
+    )
 
-    # Show what will be deleted
-    analyzer.display_deletion_preview(selected)
 
-    if dry_run:
-        console.print("\n[yellow]Dry run mode - no files were deleted.[/yellow]")
-        console.print("[dim]Use --execute to actually delete files.[/dim]")
+@app.command()
+def packages(
+    dry_run: bool = DRY_RUN_OPTION,
+    trash: bool = TRASH_OPTION,
+    interactive: bool = INTERACTIVE_OPTION,
+    npm: bool = typer.Option(True, "--npm/--no-npm", help="Include npm cache"),
+    yarn: bool = typer.Option(True, "--yarn/--no-yarn", help="Include yarn cache"),
+    pnpm: bool = typer.Option(True, "--pnpm/--no-pnpm", help="Include pnpm cache"),
+    pip: bool = typer.Option(True, "--pip/--no-pip", help="Include pip/pipx cache"),
+    cargo: bool = typer.Option(True, "--cargo/--no-cargo", help="Include Cargo cache"),
+    go: bool = typer.Option(True, "--go/--no-go", help="Include Go cache"),
+    gradle: bool = typer.Option(True, "--gradle/--no-gradle", help="Include Gradle cache"),
+    maven: bool = typer.Option(True, "--maven/--no-maven", help="Include Maven cache"),
+    composer: bool = typer.Option(True, "--composer/--no-composer", help="Include Composer cache"),
+    nuget: bool = typer.Option(True, "--nuget/--no-nuget", help="Include NuGet cache"),
+    bundler: bool = typer.Option(True, "--bundler/--no-bundler", help="Include Bundler cache"),
+    wsl_windows: bool = typer.Option(
+        True,
+        "--wsl-windows/--wsl-linux-only",
+        help="When in WSL, also scan Windows cache directories",
+    ),
+    show_all: bool = typer.Option(
+        False,
+        "--all",
+        "-a",
+        help="Show all findings, not just top offenders",
+    ),
+) -> None:
+    """Scan and clean package manager caches (npm, pip, cargo, etc.)."""
+    print_banner(console)
+
+    platform_info = get_platform_info()
+    console.print(f"[dim]Platform: {platform_info.name} ({platform_info.variant})[/dim]")
+
+    if platform_info.is_wsl:
+        wsl_status = "Included" if wsl_windows else "Excluded"
+        console.print(f"[dim]WSL Windows caches: {wsl_status}[/dim]")
+
+    console.print()
+
+    config = PackageManagerConfig(
+        npm=npm,
+        yarn=yarn,
+        pnpm=pnpm,
+        pip=pip,
+        cargo=cargo,
+        go=go,
+        gradle=gradle,
+        maven=maven,
+        composer=composer,
+        nuget=nuget,
+        bundler=bundler,
+    )
+    scanner = PackageScanner(console=console, config=config)
+
+    results = scanner.scan(wsl_include_windows=wsl_windows)
+
+    analyzer = Analyzer(console=console)
+    analyzer.display_package_results(results, show_all=show_all)
+
+    if not results.targets:
+        # Note: display_package_results already printed feedback message
         raise typer.Exit(0)
 
-    # Confirm before deletion
-    if not confirm_deletion(len(selected)):
-        console.print("[yellow]Aborted.[/yellow]")
-        raise typer.Exit(0)
-
-    # Perform cleanup
-    cleaner = Cleaner(console=console, use_trash=trash)
-    cleaner.clean(selected)
+    _handle_cleanup_flow(
+        targets=results.targets,
+        analyzer=analyzer,
+        dry_run=dry_run,
+        interactive=interactive,
+        trash=trash,
+    )
 
 
 @app.command()
@@ -349,6 +472,119 @@ def info() -> None:
     console.print(f"\n[dim]Bloat Hunter v{__version__}[/dim]")
 
 
+# Config subcommand group
+config_app = typer.Typer(
+    name="config",
+    help="Manage Bloat Hunter configuration.",
+    no_args_is_help=True,
+)
+app.add_typer(config_app)
+
+
+@config_app.command("init")
+def config_init(
+    global_config: bool = typer.Option(
+        True,
+        "--global/--local",
+        help="Create in XDG config (--global) or current directory (--local)",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Overwrite existing config file",
+    ),
+) -> None:
+    """Generate a default configuration file with comments."""
+    xdg_path, cwd_path = get_config_paths()
+    target = xdg_path if global_config else cwd_path
+
+    if target.exists() and not force:
+        console.print(f"[yellow]Config already exists: {target}[/yellow]")
+        console.print("[dim]Use --force to overwrite[/dim]")
+        raise typer.Exit(1)
+
+    # Ensure parent directory exists
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(DEFAULT_CONFIG_TEMPLATE)
+
+    location = "global" if global_config else "local"
+    console.print(f"[green]Created {location} config:[/green] {target}")
+
+
+@config_app.command("show")
+def config_show(
+    resolved: bool = typer.Option(
+        True,
+        "--resolved/--raw",
+        help="Show merged config (--resolved) or raw file (--raw)",
+    ),
+) -> None:
+    """Display the active configuration and its source."""
+    config = state.config
+    xdg_path, cwd_path = get_config_paths()
+
+    # Show source info
+    source_text = str(config._source) if config._source else "[dim]defaults only[/dim]"
+    console.print(
+        Panel.fit(
+            f"[bold]Active config:[/bold] {source_text}",
+            title="Configuration Source",
+        )
+    )
+
+    if resolved:
+        # Show resolved values as table
+        table = Table(title="Resolved Configuration", show_header=True)
+        table.add_column("Section", style="cyan")
+        table.add_column("Key", style="green")
+        table.add_column("Value")
+
+        for section_name in ["defaults", "packages", "caches", "duplicates", "scan"]:
+            section = getattr(config, section_name)
+            for key, value in vars(section).items():
+                if not key.startswith("_"):
+                    table.add_row(section_name, key, str(value))
+
+        console.print(table)
+    else:
+        # Show raw file content
+        if config._source and config._source.exists():
+            console.print(config._source.read_text())
+        else:
+            console.print("[dim]No config file found[/dim]")
+
+    # Show search locations
+    console.print("\n[bold]Config locations:[/bold]")
+    xdg_status = "[green]exists[/green]" if xdg_path.exists() else "[dim]not found[/dim]"
+    console.print(f"  Global: {xdg_path} ({xdg_status})")
+
+    cwd_status = "[green]exists[/green]" if cwd_path.exists() else "[dim]not found[/dim]"
+    console.print(f"  Local:  {cwd_path} ({cwd_status})")
+
+
+@config_app.command("path")
+def config_path() -> None:
+    """Show configuration file locations and status."""
+    xdg_path, cwd_path = get_config_paths()
+
+    console.print("[bold]Config file locations:[/bold]\n")
+
+    # XDG location
+    xdg_status = "[green]exists[/green]" if xdg_path.exists() else "[dim]not found[/dim]"
+    console.print(f"  Global (XDG): {xdg_path}")
+    console.print(f"                {xdg_status}\n")
+
+    # CWD location
+    cwd_status = (
+        "[green]exists (overrides global)[/green]"
+        if cwd_path.exists()
+        else "[dim]not found[/dim]"
+    )
+    console.print(f"  Local (CWD):  {cwd_path}")
+    console.print(f"                {cwd_status}")
+
+
 @app.callback()
 def main(
     version: bool = typer.Option(
@@ -358,11 +594,29 @@ def main(
         help="Show version and exit",
         is_eager=True,
     ),
+    config_file: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to config file (overrides default locations)",
+        exists=True,
+        readable=True,
+    ),
 ) -> None:
     """Bloat Hunter - Hunt down disk bloat across all platforms."""
     if version:
         console.print(f"Bloat Hunter v{__version__}")
         raise typer.Exit(0)
+
+    # Load config (custom file or default locations)
+    if config_file:
+        try:
+            state.config = load_config_from_file(config_file)
+        except ValueError as e:
+            console.print(f"[red]Config error: {e}[/red]")
+            raise typer.Exit(1) from e
+    else:
+        state.config = load_config()
 
 
 if __name__ == "__main__":
