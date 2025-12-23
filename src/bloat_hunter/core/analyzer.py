@@ -2,21 +2,35 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
-from bloat_hunter.core.scanner import ScanResult, BloatTarget, format_size
-from bloat_hunter.core.duplicates import DuplicateResult, DuplicateGroup, KeepStrategy
+from bloat_hunter.core.duplicates import DuplicateGroup, DuplicateResult, KeepStrategy
+from bloat_hunter.core.package_scanner import PackageScanResult, _get_manager_for_pattern
+from bloat_hunter.core.scanner import BloatTarget, ScanResult, format_size
 
 
 class Analyzer:
     """Analyzes and displays scan results."""
 
-    def __init__(self, console: Optional[Console] = None):
+    def __init__(self, console: Console | None = None):
         self.console = console or Console()
+
+    def _print_truncation_notice(self, shown: int, total: int, item_type: str) -> None:
+        """Print notice when results are truncated."""
+        if total > shown:
+            self.console.print(
+                f"\n[dim]Showing top {shown} of {total} {item_type}. "
+                f"Use --all to see everything.[/dim]"
+            )
+
+    def _print_scan_errors(self, errors: list[str]) -> None:
+        """Print notice about skipped directories due to errors."""
+        if errors:
+            self.console.print(
+                f"\n[yellow]Skipped {len(errors)} directories due to errors.[/yellow]"
+            )
 
     def display_results(self, result: ScanResult, show_all: bool = False) -> None:
         """Display scan results in a formatted table."""
@@ -59,16 +73,8 @@ class Analyzer:
             )
 
         self.console.print(table)
-
-        if not show_all and len(result.targets) > 20:
-            self.console.print(
-                f"\n[dim]Showing top 20 of {len(result.targets)} targets. "
-                f"Use --all to see everything.[/dim]"
-            )
-
-        # Show errors if any
-        if result.scan_errors:
-            self.console.print(f"\n[yellow]Skipped {len(result.scan_errors)} directories due to errors.[/yellow]")
+        self._print_truncation_notice(20, len(result.targets), "targets")
+        self._print_scan_errors(result.scan_errors)
 
     def display_deletion_preview(self, targets: list[BloatTarget]) -> None:
         """Display what will be deleted."""
@@ -89,7 +95,9 @@ class Analyzer:
             )
 
         self.console.print(table)
-        self.console.print(f"\n[bold]Total to be freed:[/bold] [cyan]{format_size(total_size)}[/cyan]")
+        self.console.print(
+            f"\n[bold]Total to be freed:[/bold] [cyan]{format_size(total_size)}[/cyan]"
+        )
 
     def display_duplicate_results(
         self, result: DuplicateResult, show_all: bool = False
@@ -136,18 +144,8 @@ class Analyzer:
             )
 
         self.console.print(table)
-
-        if not show_all and len(result.groups) > 20:
-            self.console.print(
-                f"\n[dim]Showing top 20 of {len(result.groups)} groups. "
-                f"Use --all to see everything.[/dim]"
-            )
-
-        # Show errors if any
-        if result.scan_errors:
-            self.console.print(
-                f"\n[yellow]Skipped {len(result.scan_errors)} directories due to errors.[/yellow]"
-            )
+        self._print_truncation_notice(20, len(result.groups), "groups")
+        self._print_scan_errors(result.scan_errors)
 
     def display_duplicate_group(self, group: DuplicateGroup, index: int = 0) -> None:
         """Display a single duplicate group with all file paths."""
@@ -196,3 +194,82 @@ class Analyzer:
         self.console.print(
             f"[bold]Space to free:[/bold] [cyan]{format_size(total_size)}[/cyan]"
         )
+
+    def display_package_results(
+        self, result: PackageScanResult, show_all: bool = False
+    ) -> None:
+        """Display package manager cache scan results with per-manager breakdown."""
+        if not result.targets:
+            self.console.print("[green]No package cache bloat found![/green]")
+            return
+
+        # Summary panel
+        summary = Panel(
+            f"[bold]Total Package Cache:[/bold] {result.total_size_human}\n"
+            f"[bold]Targets:[/bold] {len(result.targets)} directories",
+            title="Package Cache Summary",
+            border_style="blue",
+        )
+        self.console.print(summary)
+        self.console.print()
+
+        # Per-manager breakdown table
+        if result.by_manager:
+            breakdown_table = Table(
+                title="By Package Manager",
+                show_header=True,
+                header_style="bold cyan",
+            )
+            breakdown_table.add_column("Manager", style="yellow", width=12)
+            breakdown_table.add_column("Size", justify="right", style="cyan", width=12)
+            breakdown_table.add_column("Files", justify="right", style="dim", width=10)
+            breakdown_table.add_column("Dirs", justify="right", style="dim", width=6)
+
+            for manager, stats in result.by_manager.items():
+                if stats.size_bytes > 0:
+                    breakdown_table.add_row(
+                        manager,
+                        stats.size_human,
+                        str(stats.file_count),
+                        str(len(stats.targets)),
+                    )
+                else:
+                    # Show managers with 0 size dimmed so user knows they were checked
+                    breakdown_table.add_row(
+                        f"[dim]{manager}[/dim]",
+                        "[dim]0 B[/dim]",
+                        "[dim]0[/dim]",
+                        "[dim]0[/dim]",
+                    )
+
+            self.console.print(breakdown_table)
+            self.console.print()
+
+        # Detailed targets table
+        table = Table(
+            title="Cache Targets",
+            show_header=True,
+            header_style="bold magenta",
+        )
+        table.add_column("#", style="dim", width=4)
+        table.add_column("Size", justify="right", style="cyan", width=10)
+        table.add_column("Manager", style="yellow", width=12)
+        table.add_column("Type", style="green", width=15)
+        table.add_column("Path", style="white", overflow="ellipsis")
+
+        # Show top 20 or all
+        targets_to_show = result.targets if show_all else result.targets[:20]
+
+        for i, target in enumerate(targets_to_show, 1):
+            manager = _get_manager_for_pattern(target.pattern.name) or "unknown"
+            table.add_row(
+                str(i),
+                target.size_human,
+                manager,
+                target.pattern.name,
+                str(target.path),
+            )
+
+        self.console.print(table)
+        self._print_truncation_notice(20, len(result.targets), "targets")
+        self._print_scan_errors(result.scan_errors)
