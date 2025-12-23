@@ -505,8 +505,13 @@ def config_init(
         raise typer.Exit(1)
 
     # Ensure parent directory exists
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(DEFAULT_CONFIG_TEMPLATE)
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(DEFAULT_CONFIG_TEMPLATE)
+    except OSError as e:
+        console.print(f"[red]Permission denied: {target}[/red]")
+        console.print(f"[dim]Check write permissions for {target.parent}[/dim]")
+        raise typer.Exit(1) from e
 
     location = "global" if global_config else "local"
     console.print(f"[green]Created {location} config:[/green] {target}")

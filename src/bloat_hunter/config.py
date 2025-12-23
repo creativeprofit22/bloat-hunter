@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any, Literal
 
@@ -67,7 +67,10 @@ class DuplicatesConfig:
     @property
     def min_size_bytes(self) -> int:
         """Convert min_size to bytes."""
-        return parse_size(self.min_size)
+        try:
+            return parse_size(self.min_size)
+        except ValueError:
+            return 1048576  # 1MB fallback
 
 
 @dataclass
@@ -152,14 +155,20 @@ def _validate_config(data: dict[str, Any]) -> list[str]:
     return errors
 
 
+def _filter_known_keys(data: dict[str, Any], dataclass_type: type) -> dict[str, Any]:
+    """Filter dict to only include keys that are valid fields for the dataclass."""
+    valid_fields = {f.name for f in fields(dataclass_type)}
+    return {k: v for k, v in data.items() if k in valid_fields}
+
+
 def _dict_to_config(data: dict[str, Any], source: Path | None = None) -> Config:
     """Convert parsed TOML dict to Config dataclass."""
     return Config(
-        defaults=DefaultsConfig(**data.get("defaults", {})),
-        packages=PackagesConfig(**data.get("packages", {})),
-        caches=CachesConfig(**data.get("caches", {})),
-        duplicates=DuplicatesConfig(**data.get("duplicates", {})),
-        scan=ScanConfig(**data.get("scan", {})),
+        defaults=DefaultsConfig(**_filter_known_keys(data.get("defaults", {}), DefaultsConfig)),
+        packages=PackagesConfig(**_filter_known_keys(data.get("packages", {}), PackagesConfig)),
+        caches=CachesConfig(**_filter_known_keys(data.get("caches", {}), CachesConfig)),
+        duplicates=DuplicatesConfig(**_filter_known_keys(data.get("duplicates", {}), DuplicatesConfig)),
+        scan=ScanConfig(**_filter_known_keys(data.get("scan", {}), ScanConfig)),
         _source=source,
     )
 
@@ -175,6 +184,9 @@ def load_config() -> Config:
 
     Returns:
         Merged Config instance
+
+    Raises:
+        ValueError: If TOML syntax is invalid in either config file
     """
     xdg_path, cwd_path = get_config_paths()
 
@@ -183,14 +195,26 @@ def load_config() -> Config:
 
     # Load XDG config if exists
     if xdg_path.exists():
-        merged_data = _load_toml(xdg_path)
+        try:
+            merged_data = _load_toml(xdg_path)
+        except tomllib.TOMLDecodeError as e:
+            raise ValueError(f"Invalid TOML in {xdg_path}: {e}") from e
         active_source = xdg_path
 
     # Merge CWD config if exists (overrides XDG)
     if cwd_path.exists():
-        cwd_data = _load_toml(cwd_path)
+        try:
+            cwd_data = _load_toml(cwd_path)
+        except tomllib.TOMLDecodeError as e:
+            raise ValueError(f"Invalid TOML in {cwd_path}: {e}") from e
         merged_data = _merge_dicts(merged_data, cwd_data)
         active_source = cwd_path
+
+    # Validate merged config data
+    if merged_data:
+        errors = _validate_config(merged_data)
+        if errors:
+            raise ValueError(f"Config validation failed ({active_source}): {'; '.join(errors)}")
 
     return _dict_to_config(merged_data, active_source)
 
