@@ -19,10 +19,20 @@ from bloat_hunter.config import (
     load_config_from_file,
 )
 from bloat_hunter.core.analyzer import Analyzer
-from bloat_hunter.core.cache_scanner import CacheScanner
+from bloat_hunter.core.cache_scanner import CacheScanner, CacheScanResult
 from bloat_hunter.core.cleaner import Cleaner
-from bloat_hunter.core.duplicates import DuplicateGroup, DuplicateScanner, KeepStrategy
-from bloat_hunter.core.package_scanner import PackageManagerConfig, PackageScanner
+from bloat_hunter.core.duplicates import (
+    DuplicateGroup,
+    DuplicateResult,
+    DuplicateScanner,
+    KeepStrategy,
+)
+from bloat_hunter.core.exporter import ExportFormat, export_result
+from bloat_hunter.core.package_scanner import (
+    PackageManagerConfig,
+    PackageScanner,
+    PackageScanResult,
+)
 from bloat_hunter.core.scanner import BloatTarget, Scanner, ScanResult, parse_size
 from bloat_hunter.platform.detect import PlatformInfo, get_platform_info
 from bloat_hunter.ui.console import create_console, print_banner
@@ -123,6 +133,65 @@ INTERACTIVE_OPTION = typer.Option(
     "--interactive/--auto",
     help="Interactively select what to delete (default: interactive)",
 )
+
+OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    "-o",
+    help="Export results to file (supports .json or .csv)",
+)
+
+FORMAT_OPTION = typer.Option(
+    None,
+    "--format",
+    "-f",
+    help="Output format: json or csv (auto-detected from --output extension if not specified)",
+)
+
+VALID_EXPORT_FORMATS = ("json", "csv")
+
+
+def _resolve_export_format(output: Path | None, format: str | None) -> ExportFormat | None:
+    """Resolve export format from --output path and --format flag."""
+    if output is None:
+        return None
+
+    if format is not None:
+        if format not in VALID_EXPORT_FORMATS:
+            return None
+        return format  # type: ignore[return-value]
+
+    # Auto-detect from extension
+    suffix = output.suffix.lower()
+    if suffix == ".json":
+        return "json"
+    elif suffix == ".csv":
+        return "csv"
+    return None
+
+
+def _handle_export(
+    result: ScanResult | DuplicateResult | CacheScanResult | PackageScanResult,
+    output: Path | None,
+    format: str | None,
+) -> bool:
+    """Handle export logic. Returns True if exported, False otherwise."""
+    if output is None:
+        return False
+
+    export_format = _resolve_export_format(output, format)
+    if export_format is None:
+        console.print("[red]Invalid export format. Use --format json or --format csv[/red]")
+        console.print("[dim]Or use a .json or .csv file extension with --output[/dim]")
+        return False
+
+    try:
+        export_result(result, output, export_format)
+        console.print(f"\n[green]Exported results to:[/green] {output}")
+        return True
+    except OSError as e:
+        console.print(f"[red]Failed to export: {e}[/red]")
+        return False
 
 
 def _handle_targets_cleanup(
@@ -278,6 +347,8 @@ def scan(
         "-s",
         help="Minimum size to report (e.g., 1MB, 10MB, 100MB)",
     ),
+    output: Path | None = OUTPUT_OPTION,
+    format: str | None = FORMAT_OPTION,
 ) -> None:
     """Scan a directory for bloat and caches."""
     print_banner(console)
@@ -294,6 +365,8 @@ def scan(
 
     analyzer = Analyzer(console=console)
     analyzer.display_results(results, show_all=show_all)
+
+    _handle_export(results, output, format)
 
 
 @app.command()
@@ -372,6 +445,8 @@ def duplicates(
         help="Show all duplicate groups (default: top 20)",
     ),
     interactive: bool = INTERACTIVE_OPTION,
+    output: Path | None = OUTPUT_OPTION,
+    format: str | None = FORMAT_OPTION,
 ) -> None:
     """Find and optionally remove duplicate files."""
     print_banner(console)
@@ -397,6 +472,8 @@ def duplicates(
     # Display results
     analyzer = Analyzer(console=console)
     analyzer.display_duplicate_results(results, show_all=show_all)
+
+    _handle_export(results, output, format)
 
     if not results.groups:
         raise typer.Exit(0)
@@ -442,6 +519,8 @@ def caches(
         "-a",
         help="Show all findings, not just top offenders",
     ),
+    output: Path | None = OUTPUT_OPTION,
+    format: str | None = FORMAT_OPTION,
 ) -> None:
     """Scan and clean system cache directories (browsers, package managers, apps)."""
     print_banner(console)
@@ -474,6 +553,9 @@ def caches(
         for cat, count in results.categories_scanned.items():
             cat_label = cat.replace("_", " ").title()
             console.print(f"  - {cat_label}: {count} locations")
+
+    # Export the full CacheScanResult (not display_result) for richer data
+    _handle_export(results, output, format)
 
     if not results.targets:
         console.print("[green]No cache bloat found![/green]")
@@ -515,6 +597,8 @@ def packages(
         "-a",
         help="Show all findings, not just top offenders",
     ),
+    output: Path | None = OUTPUT_OPTION,
+    format: str | None = FORMAT_OPTION,
 ) -> None:
     """Scan and clean package manager caches (npm, pip, cargo, etc.)."""
     print_banner(console)
@@ -540,6 +624,8 @@ def packages(
 
     analyzer = Analyzer(console=console)
     analyzer.display_package_results(results, show_all=show_all)
+
+    _handle_export(results, output, format)
 
     if not results.targets:
         # Note: display_package_results already printed feedback message

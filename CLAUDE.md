@@ -3,15 +3,7 @@
 Cross-platform disk cleanup CLI tool.
 
 ## Current Focus
-Section: Size thresholds CLI
-Files: src/bloat_hunter/core/scanner.py, src/bloat_hunter/cli.py, src/bloat_hunter/config.py
-
-## Pipeline State
-Phase: build
-Feature: Size thresholds CLI
-Reports:
-  - bugs: reports/bugs-size-thresholds-cli.md
-  - refactors: reports/refactors-size-thresholds-cli.md
+Awaiting next task
 
 ## Feature Backlog
 High Priority:
@@ -22,7 +14,7 @@ High Priority:
 Medium Priority:
 4. ~~Config file support~~ - DONE (bloat-hunter config init/show/path)
 5. ~~Size thresholds CLI~~ - DONE (--min-size filter on scan/clean)
-6. Export results - JSON/CSV output
+6. ~~Export results~~ - DONE (--output/-o and --format/-f on scan/duplicates/caches/packages)
 7. Parallel scanning - concurrent.futures
 
 Low Priority:
@@ -39,11 +31,12 @@ uv run ruff check src/
 bloat-hunter config show
 ```
 
-## Last Session (2025-12-22)
-Size thresholds CLI - refactoring complete:
-- Extracted `_parse_min_size` helper in cli.py:65-71
-- Replaced 3 duplicated blocks (scan, clean, duplicates commands)
-- Low priority items skipped (intentional differences)
+## Last Session (2025-12-25)
+Export results feature complete:
+- Created `core/exporter.py` module with JSON/CSV export functions
+- Added `--output/-o` and `--format/-f` flags to scan/duplicates/caches/packages commands
+- Auto-detects format from file extension (.json/.csv)
+- All 159 tests pass
 
 ## Next Steps
-1. Pick next feature from backlog (Export results or Parallel scanning)
+1. Pick next feature from backlog (Parallel scanning)
