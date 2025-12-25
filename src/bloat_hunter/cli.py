@@ -19,19 +19,17 @@ from bloat_hunter.config import (
     load_config_from_file,
 )
 from bloat_hunter.core.analyzer import Analyzer
-from bloat_hunter.core.cache_scanner import CacheScanner, CacheScanResult
+from bloat_hunter.core.cache_scanner import CacheScanner
 from bloat_hunter.core.cleaner import Cleaner
 from bloat_hunter.core.duplicates import (
     DuplicateGroup,
-    DuplicateResult,
     DuplicateScanner,
     KeepStrategy,
 )
-from bloat_hunter.core.exporter import ExportFormat, export_result
+from bloat_hunter.core.exporter import AnyResult, ExportFormat, export_result
 from bloat_hunter.core.package_scanner import (
     PackageManagerConfig,
     PackageScanner,
-    PackageScanResult,
 )
 from bloat_hunter.core.scanner import BloatTarget, Scanner, ScanResult, parse_size
 from bloat_hunter.platform.detect import PlatformInfo, get_platform_info
@@ -171,7 +169,7 @@ def _resolve_export_format(output: Path | None, fmt: str | None) -> ExportFormat
 
 
 def _handle_export(
-    result: ScanResult | DuplicateResult | CacheScanResult | PackageScanResult,
+    result: AnyResult,
     output: Path | None,
     fmt: str | None,
 ) -> bool:

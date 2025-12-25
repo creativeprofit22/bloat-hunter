@@ -3,7 +3,20 @@
 Cross-platform disk cleanup CLI tool.
 
 ## Current Focus
-Awaiting next task
+Feature: Export Results
+Files:
+- src/bloat_hunter/core/exporter.py
+- src/bloat_hunter/cli.py
+
+## Pipeline State
+Phase: refactoring
+Feature: Export Results
+Tier: low
+Tier-Status: pending
+Reports:
+  - bugs: reports/bugs-export-results.md
+  - fixes: reports/fixes-export-results.md
+  - refactors: reports/refactors-export-results.md
 
 ## Feature Backlog
 High Priority:
@@ -32,11 +45,11 @@ bloat-hunter config show
 ```
 
 ## Last Session (2025-12-25)
-Export results feature complete:
-- Created `core/exporter.py` module with JSON/CSV export functions
-- Added `--output/-o` and `--format/-f` flags to scan/duplicates/caches/packages commands
-- Auto-detects format from file extension (.json/.csv)
-- All 159 tests pass
+Medium priority refactors complete for Export Results:
+- Consolidated duplicate `mkdir` calls into `export_result()` dispatcher
+- Removed redundant mkdir from `export_json()` and `export_csv()`
+- High + Medium refactors now complete (3/4 total)
 
 ## Next Steps
-1. Pick next feature from backlog (Parallel scanning)
+1. Execute low priority refactors from refactor report
+2. Parallel scanning feature

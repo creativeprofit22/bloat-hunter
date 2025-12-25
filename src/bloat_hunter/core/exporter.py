@@ -6,7 +6,7 @@ import csv
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
 if TYPE_CHECKING:
     from bloat_hunter.core.cache_scanner import CacheScanResult
@@ -15,6 +15,9 @@ if TYPE_CHECKING:
     from bloat_hunter.core.scanner import BloatTarget, ScanResult
 
 ExportFormat = Literal["json", "csv"]
+
+# Type alias for any scan result type
+AnyResult: TypeAlias = "ScanResult | DuplicateResult | CacheScanResult | PackageScanResult"
 
 
 def _get_timestamp() -> str:
@@ -131,7 +134,7 @@ def _package_result_to_dict(result: PackageScanResult) -> dict[str, Any]:
 
 
 def result_to_dict(
-    result: ScanResult | DuplicateResult | CacheScanResult | PackageScanResult,
+    result: AnyResult,
 ) -> dict[str, Any]:
     """Convert any result type to a serializable dict."""
     # Import here to avoid circular imports
@@ -150,7 +153,7 @@ def result_to_dict(
 
 
 def export_json(
-    result: ScanResult | DuplicateResult | CacheScanResult | PackageScanResult,
+    result: AnyResult,
     output_path: Path,
     *,
     indent: int = 2,
@@ -169,7 +172,7 @@ def export_json(
 
 
 def export_csv(
-    result: ScanResult | DuplicateResult | CacheScanResult | PackageScanResult,
+    result: AnyResult,
     output_path: Path,
 ) -> None:
     """
@@ -238,7 +241,7 @@ def _export_duplicates_csv(result: DuplicateResult, output_path: Path) -> None:
 
 
 def export_result(
-    result: ScanResult | DuplicateResult | CacheScanResult | PackageScanResult,
+    result: AnyResult,
     output_path: Path,
     fmt: ExportFormat = "json",
 ) -> None:

@@ -21,12 +21,12 @@ Files analyzed:
 | 1 | exporter.py:162,183 | Repeated `output_path.parent.mkdir(parents=True, exist_ok=True)` | Extract to `_ensure_parent_dir(path)` or call once in `export_result()` | S | ✅ Done |
 
 ## Low Priority (Nice-to-Have)
-| # | Location | Issue | Suggested Fix | Effort |
-|---|----------|-------|---------------|--------|
-| 1 | exporter.py:128-129,147-148,167-168,238-239 | Long union type repeated 4 times | Create `AnyResult` type alias | S |
+| # | Location | Issue | Suggested Fix | Effort | Status |
+|---|----------|-------|---------------|--------|--------|
+| 1 | exporter.py:128-129,147-148,167-168,238-239 | Long union type repeated 4 times | Create `AnyResult` type alias | S | ✅ Done |
 
 ## Summary
 - High: 2 refactors ✅ Done
 - Medium: 1 refactor ✅ Done
-- Low: 1 refactor (pending)
-- Total: 4 refactors (3 complete, 1 pending)
+- Low: 1 refactor ✅ Done
+- Total: 4 refactors (all complete)
