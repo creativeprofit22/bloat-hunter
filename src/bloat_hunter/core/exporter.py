@@ -17,18 +17,9 @@ if TYPE_CHECKING:
 ExportFormat = Literal["json", "csv"]
 
 
-def _serialize_path(obj: Any) -> Any:
-    """Custom serializer for Path objects and other non-JSON types."""
-    if isinstance(obj, Path):
-        return str(obj)
-    if hasattr(obj, "__dict__"):
-        # For dataclasses or objects with __dict__
-        return {k: _serialize_path(v) for k, v in obj.__dict__.items()}
-    if isinstance(obj, dict):
-        return {k: _serialize_path(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_serialize_path(item) for item in obj]
-    return obj
+def _get_timestamp() -> str:
+    """Return current UTC timestamp in ISO format."""
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _target_to_dict(target: BloatTarget) -> dict[str, Any]:
@@ -47,7 +38,7 @@ def _scan_result_to_dict(result: ScanResult) -> dict[str, Any]:
     """Convert ScanResult to serializable dict."""
     return {
         "type": "scan",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": _get_timestamp(),
         "root_path": str(result.root_path),
         "total_size_bytes": result.total_size,
         "total_size_human": result.total_size_human,
@@ -80,7 +71,7 @@ def _duplicate_result_to_dict(result: DuplicateResult) -> dict[str, Any]:
 
     return {
         "type": "duplicates",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": _get_timestamp(),
         "root_path": str(result.root_path),
         "files_scanned": result.files_scanned,
         "total_wasted_bytes": result.total_wasted,
@@ -96,7 +87,7 @@ def _cache_result_to_dict(result: CacheScanResult) -> dict[str, Any]:
     """Convert CacheScanResult to serializable dict."""
     return {
         "type": "caches",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": _get_timestamp(),
         "platform": {
             "name": result.platform_info.name,
             "variant": result.platform_info.variant,
@@ -124,7 +115,7 @@ def _package_result_to_dict(result: PackageScanResult) -> dict[str, Any]:
 
     return {
         "type": "packages",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": _get_timestamp(),
         "platform": {
             "name": result.platform_info.name,
             "variant": result.platform_info.variant,
@@ -173,7 +164,6 @@ def export_json(
         indent: JSON indentation level (default: 2)
     """
     data = result_to_dict(result)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=indent, ensure_ascii=False)
 
@@ -193,8 +183,6 @@ def export_csv(
         output_path: Path to write CSV file
     """
     from bloat_hunter.core.duplicates import DuplicateResult
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if isinstance(result, DuplicateResult):
         _export_duplicates_csv(result, output_path)
@@ -252,7 +240,7 @@ def _export_duplicates_csv(result: DuplicateResult, output_path: Path) -> None:
 def export_result(
     result: ScanResult | DuplicateResult | CacheScanResult | PackageScanResult,
     output_path: Path,
-    format: ExportFormat = "json",
+    fmt: ExportFormat = "json",
 ) -> None:
     """
     Export scan results to file in specified format.
@@ -260,14 +248,16 @@ def export_result(
     Args:
         result: Scan result to export
         output_path: Path to write output file
-        format: Output format ("json" or "csv")
+        fmt: Output format ("json" or "csv")
 
     Raises:
         ValueError: If format is not supported
     """
-    if format == "json":
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if fmt == "json":
         export_json(result, output_path)
-    elif format == "csv":
+    elif fmt == "csv":
         export_csv(result, output_path)
     else:
-        raise ValueError(f"Unsupported export format: {format}")
+        raise ValueError(f"Unsupported export format: {fmt}")

@@ -151,15 +151,15 @@ FORMAT_OPTION = typer.Option(
 VALID_EXPORT_FORMATS = ("json", "csv")
 
 
-def _resolve_export_format(output: Path | None, format: str | None) -> ExportFormat | None:
+def _resolve_export_format(output: Path | None, fmt: str | None) -> ExportFormat | None:
     """Resolve export format from --output path and --format flag."""
     if output is None:
         return None
 
-    if format is not None:
-        if format not in VALID_EXPORT_FORMATS:
+    if fmt is not None:
+        if fmt not in VALID_EXPORT_FORMATS:
             return None
-        return format  # type: ignore[return-value]
+        return fmt  # type: ignore[return-value]
 
     # Auto-detect from extension
     suffix = output.suffix.lower()
@@ -173,16 +173,23 @@ def _resolve_export_format(output: Path | None, format: str | None) -> ExportFor
 def _handle_export(
     result: ScanResult | DuplicateResult | CacheScanResult | PackageScanResult,
     output: Path | None,
-    format: str | None,
+    fmt: str | None,
 ) -> bool:
     """Handle export logic. Returns True if exported, False otherwise."""
     if output is None:
         return False
 
-    export_format = _resolve_export_format(output, format)
+    export_format = _resolve_export_format(output, fmt)
     if export_format is None:
-        console.print("[red]Invalid export format. Use --format json or --format csv[/red]")
-        console.print("[dim]Or use a .json or .csv file extension with --output[/dim]")
+        if fmt is not None:
+            # User explicitly specified --format but it's invalid
+            console.print(f"[red]Invalid export format: {fmt}[/red]")
+            console.print(f"[dim]Valid formats: {', '.join(VALID_EXPORT_FORMATS)}[/dim]")
+        else:
+            # Auto-detection failed - extension not recognized
+            ext = output.suffix or "(no extension)"
+            console.print(f"[red]Unrecognized file extension: {ext}[/red]")
+            console.print("[dim]Use --format json/csv, or use .json/.csv extension[/dim]")
         return False
 
     try:
@@ -348,7 +355,7 @@ def scan(
         help="Minimum size to report (e.g., 1MB, 10MB, 100MB)",
     ),
     output: Path | None = OUTPUT_OPTION,
-    format: str | None = FORMAT_OPTION,
+    fmt: str | None = FORMAT_OPTION,
 ) -> None:
     """Scan a directory for bloat and caches."""
     print_banner(console)
@@ -366,7 +373,7 @@ def scan(
     analyzer = Analyzer(console=console)
     analyzer.display_results(results, show_all=show_all)
 
-    _handle_export(results, output, format)
+    _handle_export(results, output, fmt)
 
 
 @app.command()
@@ -446,7 +453,7 @@ def duplicates(
     ),
     interactive: bool = INTERACTIVE_OPTION,
     output: Path | None = OUTPUT_OPTION,
-    format: str | None = FORMAT_OPTION,
+    fmt: str | None = FORMAT_OPTION,
 ) -> None:
     """Find and optionally remove duplicate files."""
     print_banner(console)
@@ -473,7 +480,7 @@ def duplicates(
     analyzer = Analyzer(console=console)
     analyzer.display_duplicate_results(results, show_all=show_all)
 
-    _handle_export(results, output, format)
+    _handle_export(results, output, fmt)
 
     if not results.groups:
         raise typer.Exit(0)
@@ -520,7 +527,7 @@ def caches(
         help="Show all findings, not just top offenders",
     ),
     output: Path | None = OUTPUT_OPTION,
-    format: str | None = FORMAT_OPTION,
+    fmt: str | None = FORMAT_OPTION,
 ) -> None:
     """Scan and clean system cache directories (browsers, package managers, apps)."""
     print_banner(console)
@@ -555,7 +562,7 @@ def caches(
             console.print(f"  - {cat_label}: {count} locations")
 
     # Export the full CacheScanResult (not display_result) for richer data
-    _handle_export(results, output, format)
+    _handle_export(results, output, fmt)
 
     if not results.targets:
         console.print("[green]No cache bloat found![/green]")
@@ -598,7 +605,7 @@ def packages(
         help="Show all findings, not just top offenders",
     ),
     output: Path | None = OUTPUT_OPTION,
-    format: str | None = FORMAT_OPTION,
+    fmt: str | None = FORMAT_OPTION,
 ) -> None:
     """Scan and clean package manager caches (npm, pip, cargo, etc.)."""
     print_banner(console)
@@ -625,7 +632,7 @@ def packages(
     analyzer = Analyzer(console=console)
     analyzer.display_package_results(results, show_all=show_all)
 
-    _handle_export(results, output, format)
+    _handle_export(results, output, fmt)
 
     if not results.targets:
         # Note: display_package_results already printed feedback message
