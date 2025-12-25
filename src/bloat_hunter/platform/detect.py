@@ -17,7 +17,7 @@ class WindowsEnvPaths:
     app_data: Optional[Path] = None
 
     @classmethod
-    def from_environ(cls) -> "WindowsEnvPaths":
+    def from_environ(cls) -> WindowsEnvPaths:
         """Create from current environment variables."""
         local = os.environ.get("LOCALAPPDATA")
         app = os.environ.get("APPDATA")
@@ -35,7 +35,7 @@ class XdgPaths:
     config_home: Path
 
     @classmethod
-    def from_environ(cls, home_dir: Path) -> "XdgPaths":
+    def from_environ(cls, home_dir: Path) -> XdgPaths:
         """Create from current environment variables with home fallback."""
         return cls(
             cache_home=Path(os.environ.get("XDG_CACHE_HOME") or (home_dir / ".cache")),
@@ -62,7 +62,7 @@ def _detect_wsl() -> tuple[bool, Optional[str], Optional[Path]]:
         return False, None, None
 
     try:
-        with open("/proc/version", "r") as f:
+        with open("/proc/version") as f:
             version = f.read().lower()
             if "microsoft" not in version and "wsl" not in version:
                 return False, None, None

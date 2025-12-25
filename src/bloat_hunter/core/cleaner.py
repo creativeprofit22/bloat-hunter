@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Optional
 
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, MofNCompleteColumn
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
 
-from bloat_hunter.core.scanner import BloatTarget, format_size
 from bloat_hunter.core.duplicates import DuplicateGroup, KeepStrategy
+from bloat_hunter.core.scanner import BloatTarget, format_size
 from bloat_hunter.safety.protected import is_protected_path
 
 

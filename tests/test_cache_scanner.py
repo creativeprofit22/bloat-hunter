@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 from bloat_hunter.core.cache_scanner import CacheScanner, CacheScanResult
 from bloat_hunter.platform.detect import PlatformInfo
 

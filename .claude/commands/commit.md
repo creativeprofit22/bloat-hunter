@@ -5,7 +5,7 @@ description: Run checks, commit with AI message, and push
 
 1. Run quality checks:
    ```bash
-   ruff check src/
+   ruff check src/ tests/
    mypy src/
    ```
    Fix ALL errors before continuing.

@@ -9,23 +9,23 @@ from typing import Optional
 
 from rich.console import Console
 from rich.progress import (
+    BarColumn,
     Progress,
     SpinnerColumn,
-    TextColumn,
-    BarColumn,
     TaskProgressColumn,
+    TextColumn,
 )
 
 from bloat_hunter.core.parallel import ParallelConfig, parallel_map
-from bloat_hunter.platform.detect import (
-    get_platform_info,
-    get_all_cache_paths,
-    PlatformInfo,
-)
+from bloat_hunter.core.scanner import BloatTarget, format_size, get_directory_size
 from bloat_hunter.patterns import get_system_cache_patterns
 from bloat_hunter.patterns.base import BloatPattern
+from bloat_hunter.platform.detect import (
+    PlatformInfo,
+    get_all_cache_paths,
+    get_platform_info,
+)
 from bloat_hunter.safety.protected import is_protected_path
-from bloat_hunter.core.scanner import BloatTarget, format_size, get_directory_size
 
 
 @dataclass
@@ -244,30 +244,4 @@ class CacheScanner:
         for pattern in self.patterns:
             if pattern.matches(name, path):
                 return pattern
-        return None
-
-    def _create_target(
-        self, path: Path, pattern: BloatPattern
-    ) -> Optional[BloatTarget]:
-        """
-        Create a BloatTarget for a path matching a pattern.
-
-        Args:
-            path: Directory path to create target for
-            pattern: The matched bloat pattern
-
-        Returns:
-            BloatTarget if size meets minimum threshold, None otherwise
-        """
-        try:
-            size, count = get_directory_size(path)
-            if size >= pattern.min_size:
-                return BloatTarget(
-                    path=path,
-                    pattern=pattern,
-                    size_bytes=size,
-                    file_count=count,
-                )
-        except (PermissionError, OSError):
-            pass
         return None

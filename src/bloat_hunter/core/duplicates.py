@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import os
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional, Protocol
 
 from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
@@ -17,6 +18,13 @@ from bloat_hunter.safety.protected import is_protected_path
 
 if TYPE_CHECKING:
     from rich.progress import TaskID
+
+
+class Hasher(Protocol):
+    """Protocol for hash objects (xxhash or hashlib)."""
+
+    def update(self, data: bytes) -> None: ...
+    def hexdigest(self) -> str: ...
 
 # Default minimum file size (1 MB)
 DEFAULT_MIN_SIZE = 1024 * 1024
@@ -71,6 +79,8 @@ class DuplicateGroup:
 
     def get_keep_file(self, strategy: KeepStrategy) -> DuplicateFile:
         """Determine which file to keep based on strategy."""
+        if not self.files:
+            raise ValueError("Cannot get keep file from empty DuplicateGroup")
         if strategy == "shortest":
             return min(self.files, key=lambda f: len(str(f.path)))
         elif strategy == "oldest":
@@ -107,7 +117,7 @@ class DuplicateResult:
         return sum(g.duplicate_count for g in self.groups)
 
 
-def _get_hasher() -> Callable[[], object]:
+def _get_hasher() -> Callable[[], Hasher]:
     """Get the best available hash function."""
     try:
         import xxhash
@@ -135,8 +145,8 @@ def hash_file(path: Path) -> Optional[str]:
     try:
         with open(path, "rb") as f:
             while chunk := f.read(CHUNK_SIZE):
-                hasher.update(chunk)  # type: ignore[union-attr]
-        return hasher.hexdigest()  # type: ignore[union-attr]
+                hasher.update(chunk)
+        return hasher.hexdigest()
     except (PermissionError, OSError):
         return None
 
@@ -271,7 +281,7 @@ class DuplicateScanner:
         size_groups: dict[int, list[Path]],
         result: DuplicateResult,
         progress: Progress,
-        task_id: "TaskID",
+        task_id: TaskID,
     ) -> None:
         """Recursively collect files grouped by size."""
         if is_protected_path(path, for_scanning=True):

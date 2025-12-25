@@ -5,9 +5,7 @@ from __future__ import annotations
 import platform
 from pathlib import Path
 
-import pytest
-
-from bloat_hunter.platform.detect import get_platform_info, PlatformInfo
+from bloat_hunter.platform.detect import PlatformInfo, get_platform_info
 
 
 class TestGetPlatformInfo:

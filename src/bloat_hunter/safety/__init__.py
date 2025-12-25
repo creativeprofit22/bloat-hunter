@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from .protected import is_protected_path, PROTECTED, ProtectedConfig
+from .protected import PROTECTED, ProtectedConfig, is_protected_path
 
 __all__ = ["is_protected_path", "PROTECTED", "ProtectedConfig"]

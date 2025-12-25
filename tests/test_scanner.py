@@ -5,8 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
-from bloat_hunter.core.scanner import Scanner, get_directory_size, format_size, parse_size
+from bloat_hunter.core.scanner import Scanner, format_size, get_directory_size, parse_size
 
 
 class TestFormatSize:

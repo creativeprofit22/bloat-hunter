@@ -4,12 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from bloat_hunter.patterns.browser_cache import (
+    APP_CACHE_PATTERNS,
     BROWSER_CACHE_PATTERNS,
     PACKAGE_MANAGER_PATTERNS,
-    APP_CACHE_PATTERNS,
     get_browser_cache_patterns,
     get_system_cache_patterns,
 )

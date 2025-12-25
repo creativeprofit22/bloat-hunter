@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from .base import BloatPattern
 
-
 CACHE_PATTERNS: list[BloatPattern] = [
     # Python
     BloatPattern(

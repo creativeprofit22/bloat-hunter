@@ -3,12 +3,22 @@
 Cross-platform disk cleanup CLI tool.
 
 ## Current Focus
-Awaiting next task
+Section: Parallel Scanning
+Files:
+  - src/bloat_hunter/core/parallel.py
+  - src/bloat_hunter/core/scanner.py
+  - src/bloat_hunter/core/duplicates.py
+  - src/bloat_hunter/core/cache_scanner.py
+  - src/bloat_hunter/core/package_scanner.py
+  - src/bloat_hunter/cli.py
 
 ## Pipeline State
-Phase: build
+Phase: debugging
 Feature: Parallel Scanning
-Status: complete
+Tier: medium
+Tier-Status: pending
+Reports:
+  - bugs: reports/bugs-parallel-scanning.md
 
 ## Feature Backlog
 High Priority:
@@ -37,17 +47,12 @@ bloat-hunter config show
 ```
 
 ## Last Session (2025-12-25)
-Parallel Scanning feature complete:
-- Created core/parallel.py module with ThreadPoolExecutor wrapper
-- Parallelized DuplicateScanner hashing phase (biggest performance win)
-- Parallelized get_directory_size for batch operations
-- Updated Scanner, CacheScanner, PackageScanner with two-phase approach:
-  - Phase 1: Collect all matching directories (fast traversal)
-  - Phase 2: Calculate sizes in parallel using ThreadPoolExecutor
-- Added --parallel/--no-parallel and --workers CLI flags to all scan commands
-- Created 17 new tests in test_parallel.py
-- All 176 tests pass
+Fixed high priority bugs from parallel scanning bug hunt:
+- scanner.py: Fixed format_size type mutation (use local float variable)
+- cache_scanner.py: Changed broad `except Exception` to `(PermissionError, OSError)`
+- Committed and pushed: 345ff67
 
 ## Next Steps
-1. Windows native testing
-2. Interactive TUI - full-screen mode
+1. Fix medium priority bugs (dead code removal, empty list check)
+2. Fix low priority bugs (code duplication, long line)
+3. Windows native testing

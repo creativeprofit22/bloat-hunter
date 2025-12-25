@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 from bloat_hunter.core.package_scanner import (
+    PACKAGE_MANAGER_GROUPS,
     PackageManagerConfig,
+    PackageManagerStats,
     PackageScanner,
     PackageScanResult,
-    PackageManagerStats,
-    PACKAGE_MANAGER_GROUPS,
     _get_manager_for_pattern,
 )
 from bloat_hunter.platform.detect import PlatformInfo

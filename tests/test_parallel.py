@@ -5,8 +5,6 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-import pytest
-
 from bloat_hunter.core.parallel import (
     DEFAULT_WORKERS,
     ParallelConfig,

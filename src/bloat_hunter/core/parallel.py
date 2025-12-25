@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterator, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 R = TypeVar("R")
 
 # Default number of workers (use CPU count or fallback to 4)
 DEFAULT_WORKERS = min(os.cpu_count() or 4, 8)
+
+# Minimum items needed to benefit from parallel execution
+MIN_PARALLEL_ITEMS = 2
 
 
 @dataclass
@@ -51,7 +55,7 @@ def parallel_map(
     if config is None:
         config = ParallelConfig()
 
-    if not config.enabled or len(items) <= 1:
+    if not config.enabled or len(items) < MIN_PARALLEL_ITEMS:
         # Sequential fallback
         for item in items:
             try:
@@ -92,9 +96,10 @@ def parallel_map_ordered(
     if config is None:
         config = ParallelConfig()
 
-    results: dict[int, tuple[T, R | None, Exception | None]] = {}
+    n = len(items)
+    results: list[tuple[T, R | None, Exception | None] | None] = [None] * n
 
-    if not config.enabled or len(items) <= 1:
+    if not config.enabled or n < MIN_PARALLEL_ITEMS:
         # Sequential fallback
         for i, item in enumerate(items):
             try:
@@ -116,7 +121,7 @@ def parallel_map_ordered(
                 except Exception as e:
                     results[idx] = (item, None, e)
 
-    return [results[i] for i in range(len(items))]
+    return results  # type: ignore[return-value]
 
 
 def get_directory_sizes_parallel(

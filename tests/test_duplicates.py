@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from bloat_hunter.core.duplicates import (
     DuplicateFile,
     DuplicateGroup,

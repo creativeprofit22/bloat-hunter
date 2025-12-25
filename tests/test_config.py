@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from bloat_hunter.config import (
     DEFAULT_CONFIG_TEMPLATE,
     VALID_KEEP_STRATEGIES,

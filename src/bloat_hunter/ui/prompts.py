@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 import typer
 
 if TYPE_CHECKING:
-    from bloat_hunter.core.scanner import BloatTarget
     from bloat_hunter.core.duplicates import DuplicateGroup
+    from bloat_hunter.core.scanner import BloatTarget
 
 
 def confirm_deletion(count: int) -> bool:
@@ -27,7 +27,7 @@ def confirm_deletion(count: int) -> bool:
     )
 
 
-def select_targets(targets: list["BloatTarget"]) -> list["BloatTarget"]:
+def select_targets(targets: list[BloatTarget]) -> list[BloatTarget]:
     """
     Let user interactively select which targets to delete.
 
@@ -89,7 +89,7 @@ def select_scan_path() -> str:
         return typer.prompt("Enter path to scan", default=".")
 
 
-def select_duplicate_groups(groups: list["DuplicateGroup"]) -> list["DuplicateGroup"]:
+def select_duplicate_groups(groups: list[DuplicateGroup]) -> list[DuplicateGroup]:
     """
     Let user interactively select which duplicate groups to clean.
 

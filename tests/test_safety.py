@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from bloat_hunter.safety.protected import is_protected_path
 
 

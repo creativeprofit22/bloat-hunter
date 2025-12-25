@@ -359,29 +359,3 @@ class PackageScanner:
             if pattern.matches(name, path):
                 return pattern
         return None
-
-    def _create_target(
-        self, path: Path, pattern: BloatPattern
-    ) -> BloatTarget | None:
-        """
-        Create a BloatTarget for a path matching a pattern.
-
-        Args:
-            path: Directory path to create target for
-            pattern: The matched bloat pattern
-
-        Returns:
-            BloatTarget if size meets minimum threshold, None otherwise
-        """
-        try:
-            size, count = get_directory_size(path)
-            if size >= pattern.min_size:
-                return BloatTarget(
-                    path=path,
-                    pattern=pattern,
-                    size_bytes=size,
-                    file_count=count,
-                )
-        except FILESYSTEM_ERRORS as e:
-            logger.debug("Failed to get size for %s: %s", path, e)
-        return None

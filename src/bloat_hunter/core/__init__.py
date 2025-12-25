@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from .scanner import Scanner
 from .analyzer import Analyzer
 from .cleaner import Cleaner
+from .scanner import Scanner
 
 __all__ = ["Scanner", "Analyzer", "Cleaner"]

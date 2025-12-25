@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from .detect import get_platform_info, PlatformInfo
+from .detect import PlatformInfo, get_platform_info
 
 __all__ = ["get_platform_info", "PlatformInfo"]

@@ -8,13 +8,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 
 if TYPE_CHECKING:
     from rich.progress import TaskID
 
 from bloat_hunter.core.parallel import ParallelConfig, parallel_map
-from bloat_hunter.patterns import get_all_patterns, BloatPattern
+from bloat_hunter.patterns import BloatPattern, get_all_patterns
 from bloat_hunter.safety.protected import is_protected_path
 
 
@@ -173,7 +173,10 @@ class Scanner:
             console=self.console,
         ) as progress:
             task = progress.add_task("Scanning for bloat...", total=None)
-            self._collect_matches(root, matches, result, progress, task, depth=0, max_depth=10 if deep else 5)
+            max_depth = 10 if deep else 5
+            self._collect_matches(
+                root, matches, result, progress, task, depth=0, max_depth=max_depth
+            )
 
         if not matches:
             return result
@@ -226,7 +229,7 @@ class Scanner:
         matches: list[tuple[Path, BloatPattern]],
         result: ScanResult,
         progress: Progress,
-        task_id: "TaskID",
+        task_id: TaskID,
         depth: int,
         max_depth: int,
     ) -> None:

@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 from .base import BloatPattern
-from .cache import CACHE_PATTERNS
-from .dev import DEV_PATTERNS
-from .system import SYSTEM_PATTERNS
 from .browser_cache import (
+    APP_CACHE_PATTERNS,
     BROWSER_CACHE_PATTERNS,
     PACKAGE_MANAGER_PATTERNS,
-    APP_CACHE_PATTERNS,
     get_browser_cache_patterns,
     get_system_cache_patterns,
 )
+from .cache import CACHE_PATTERNS
+from .dev import DEV_PATTERNS
+from .system import SYSTEM_PATTERNS
 
 
 def get_all_patterns() -> list[BloatPattern]:
