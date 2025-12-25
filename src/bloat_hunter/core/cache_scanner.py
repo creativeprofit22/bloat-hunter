@@ -127,7 +127,7 @@ class CacheScanner:
                     result.categories_scanned[category] = (
                         result.categories_scanned.get(category, 0) + 1
                     )
-                except Exception as e:
+                except (PermissionError, OSError) as e:
                     result.scan_errors.append(f"{cache_path}: {e}")
 
                 progress.advance(task)

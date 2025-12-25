@@ -55,11 +55,12 @@ class ScanResult:
 
 def format_size(size_bytes: int) -> str:
     """Convert bytes to human-readable format."""
+    size = float(size_bytes)
     for unit in ["B", "KB", "MB", "GB", "TB"]:
-        if size_bytes < 1024:
-            return f"{size_bytes:.1f} {unit}"
-        size_bytes /= 1024
-    return f"{size_bytes:.1f} PB"
+        if size < 1024:
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} PB"
 
 
 def parse_size(size_str: str) -> int:
