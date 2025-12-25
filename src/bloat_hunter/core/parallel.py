@@ -1,0 +1,144 @@
+"""Parallel execution utilities for scanning operations."""
+
+from __future__ import annotations
+
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable, Iterator, TypeVar
+
+T = TypeVar("T")
+R = TypeVar("R")
+
+# Default number of workers (use CPU count or fallback to 4)
+DEFAULT_WORKERS = min(os.cpu_count() or 4, 8)
+
+
+@dataclass
+class ParallelConfig:
+    """Configuration for parallel execution."""
+
+    enabled: bool = True
+    max_workers: int = DEFAULT_WORKERS
+
+    def __post_init__(self) -> None:
+        if self.max_workers < 1:
+            self.max_workers = 1
+        elif self.max_workers > 32:
+            self.max_workers = 32
+
+
+def parallel_map(
+    func: Callable[[T], R],
+    items: list[T],
+    config: ParallelConfig | None = None,
+) -> Iterator[tuple[T, R | None, Exception | None]]:
+    """
+    Apply a function to items in parallel.
+
+    Yields results as they complete, with error handling per item.
+
+    Args:
+        func: Function to apply to each item
+        items: List of items to process
+        config: Parallel execution configuration
+
+    Yields:
+        Tuple of (item, result, error) for each item.
+        If successful, error is None. If failed, result is None.
+    """
+    if config is None:
+        config = ParallelConfig()
+
+    if not config.enabled or len(items) <= 1:
+        # Sequential fallback
+        for item in items:
+            try:
+                result = func(item)
+                yield (item, result, None)
+            except Exception as e:
+                yield (item, None, e)
+        return
+
+    with ThreadPoolExecutor(max_workers=config.max_workers) as executor:
+        future_to_item = {executor.submit(func, item): item for item in items}
+
+        for future in as_completed(future_to_item):
+            item = future_to_item[future]
+            try:
+                result = future.result()
+                yield (item, result, None)
+            except Exception as e:
+                yield (item, None, e)
+
+
+def parallel_map_ordered(
+    func: Callable[[T], R],
+    items: list[T],
+    config: ParallelConfig | None = None,
+) -> list[tuple[T, R | None, Exception | None]]:
+    """
+    Apply a function to items in parallel, returning results in original order.
+
+    Args:
+        func: Function to apply to each item
+        items: List of items to process
+        config: Parallel execution configuration
+
+    Returns:
+        List of (item, result, error) tuples in the same order as input items.
+    """
+    if config is None:
+        config = ParallelConfig()
+
+    results: dict[int, tuple[T, R | None, Exception | None]] = {}
+
+    if not config.enabled or len(items) <= 1:
+        # Sequential fallback
+        for i, item in enumerate(items):
+            try:
+                result = func(item)
+                results[i] = (item, result, None)
+            except Exception as e:
+                results[i] = (item, None, e)
+    else:
+        with ThreadPoolExecutor(max_workers=config.max_workers) as executor:
+            future_to_idx = {
+                executor.submit(func, item): (i, item) for i, item in enumerate(items)
+            }
+
+            for future in as_completed(future_to_idx):
+                idx, item = future_to_idx[future]
+                try:
+                    result = future.result()
+                    results[idx] = (item, result, None)
+                except Exception as e:
+                    results[idx] = (item, None, e)
+
+    return [results[i] for i in range(len(items))]
+
+
+def get_directory_sizes_parallel(
+    paths: list[Path],
+    size_func: Callable[[Path], tuple[int, int]],
+    config: ParallelConfig | None = None,
+) -> dict[Path, tuple[int, int]]:
+    """
+    Calculate directory sizes for multiple paths in parallel.
+
+    Args:
+        paths: List of directory paths to size
+        size_func: Function that returns (size_bytes, file_count) for a path
+        config: Parallel execution configuration
+
+    Returns:
+        Dict mapping path to (size_bytes, file_count). Paths that failed are omitted.
+    """
+    results: dict[Path, tuple[int, int]] = {}
+
+    for path, size_result, error in parallel_map(size_func, paths, config):
+        if error is None and size_result is not None:
+            results[path] = size_result
+
+    return results

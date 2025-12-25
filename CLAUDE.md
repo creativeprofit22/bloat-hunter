@@ -3,20 +3,12 @@
 Cross-platform disk cleanup CLI tool.
 
 ## Current Focus
-Feature: Export Results
-Files:
-- src/bloat_hunter/core/exporter.py
-- src/bloat_hunter/cli.py
+Awaiting next task
 
 ## Pipeline State
-Phase: refactoring
-Feature: Export Results
-Tier: low
-Tier-Status: pending
-Reports:
-  - bugs: reports/bugs-export-results.md
-  - fixes: reports/fixes-export-results.md
-  - refactors: reports/refactors-export-results.md
+Phase: build
+Feature: Parallel Scanning
+Status: complete
 
 ## Feature Backlog
 High Priority:
@@ -28,7 +20,7 @@ Medium Priority:
 4. ~~Config file support~~ - DONE (bloat-hunter config init/show/path)
 5. ~~Size thresholds CLI~~ - DONE (--min-size filter on scan/clean)
 6. ~~Export results~~ - DONE (--output/-o and --format/-f on scan/duplicates/caches/packages)
-7. Parallel scanning - concurrent.futures
+7. ~~Parallel scanning~~ - DONE (--parallel/--no-parallel, --workers on all scan commands)
 
 Low Priority:
 8. Windows native testing
@@ -45,11 +37,17 @@ bloat-hunter config show
 ```
 
 ## Last Session (2025-12-25)
-Medium priority refactors complete for Export Results:
-- Consolidated duplicate `mkdir` calls into `export_result()` dispatcher
-- Removed redundant mkdir from `export_json()` and `export_csv()`
-- High + Medium refactors now complete (3/4 total)
+Parallel Scanning feature complete:
+- Created core/parallel.py module with ThreadPoolExecutor wrapper
+- Parallelized DuplicateScanner hashing phase (biggest performance win)
+- Parallelized get_directory_size for batch operations
+- Updated Scanner, CacheScanner, PackageScanner with two-phase approach:
+  - Phase 1: Collect all matching directories (fast traversal)
+  - Phase 2: Calculate sizes in parallel using ThreadPoolExecutor
+- Added --parallel/--no-parallel and --workers CLI flags to all scan commands
+- Created 17 new tests in test_parallel.py
+- All 176 tests pass
 
 ## Next Steps
-1. Execute low priority refactors from refactor report
-2. Parallel scanning feature
+1. Windows native testing
+2. Interactive TUI - full-screen mode

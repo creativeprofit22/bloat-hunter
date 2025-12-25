@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Callable, Literal, Optional
 from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 
+from bloat_hunter.core.parallel import ParallelConfig, parallel_map
 from bloat_hunter.core.scanner import format_size
 from bloat_hunter.safety.protected import is_protected_path
 
@@ -147,9 +148,11 @@ class DuplicateScanner:
         self,
         console: Optional[Console] = None,
         min_size: int = DEFAULT_MIN_SIZE,
+        parallel_config: Optional[ParallelConfig] = None,
     ):
         self.console = console or Console()
         self.min_size = min_size
+        self.parallel_config = parallel_config or ParallelConfig()
 
     def scan(self, root: Path) -> DuplicateResult:
         """
@@ -186,8 +189,14 @@ class DuplicateScanner:
         if not candidate_groups:
             return result
 
-        # Phase 2: Hash files with matching sizes
+        # Phase 2: Hash files with matching sizes (parallel)
         total_candidates = sum(len(paths) for paths in candidate_groups.values())
+
+        # Flatten candidate groups into list of (size, path) tuples for parallel processing
+        candidates: list[tuple[int, Path]] = []
+        for size, paths in candidate_groups.items():
+            for path in paths:
+                candidates.append((size, path))
 
         with Progress(
             SpinnerColumn(),
@@ -200,38 +209,50 @@ class DuplicateScanner:
 
             hash_groups: dict[str, DuplicateGroup] = {}
 
-            for size, paths in candidate_groups.items():
-                for path in paths:
-                    progress.update(task, description=f"Hashing: {path.name[:40]}")
+            # Hash files in parallel
+            def hash_candidate(item: tuple[int, Path]) -> tuple[int, Path, str | None, float]:
+                """Hash a single file and return metadata."""
+                size, path = item
+                file_hash = hash_file(path)
+                try:
+                    mtime = path.stat().st_mtime
+                except OSError:
+                    mtime = 0.0
+                return (size, path, file_hash, mtime)
 
-                    file_hash = hash_file(path)
-                    if file_hash is None:
-                        progress.advance(task)
-                        continue
+            for item, hash_result, error in parallel_map(
+                hash_candidate, candidates, self.parallel_config
+            ):
+                size, path = item
+                progress.update(task, description=f"Hashing: {path.name[:40]}")
 
-                    # Create composite key: size + hash
-                    key = f"{size}:{file_hash}"
+                if error is not None or hash_result is None:
+                    progress.advance(task)
+                    continue
 
-                    if key not in hash_groups:
-                        hash_groups[key] = DuplicateGroup(
-                            hash_value=file_hash,
-                            size_bytes=size,
-                        )
+                _, _, file_hash, mtime = hash_result
+                if file_hash is None:
+                    progress.advance(task)
+                    continue
 
-                    try:
-                        mtime = path.stat().st_mtime
-                    except OSError:
-                        mtime = 0.0
+                # Create composite key: size + hash
+                key = f"{size}:{file_hash}"
 
-                    hash_groups[key].files.append(
-                        DuplicateFile(
-                            path=path,
-                            size_bytes=size,
-                            mtime=mtime,
-                        )
+                if key not in hash_groups:
+                    hash_groups[key] = DuplicateGroup(
+                        hash_value=file_hash,
+                        size_bytes=size,
                     )
 
-                    progress.advance(task)
+                hash_groups[key].files.append(
+                    DuplicateFile(
+                        path=path,
+                        size_bytes=size,
+                        mtime=mtime,
+                    )
+                )
+
+                progress.advance(task)
 
         # Filter to only groups with actual duplicates
         result.groups = [group for group in hash_groups.values() if len(group.files) >= 2]

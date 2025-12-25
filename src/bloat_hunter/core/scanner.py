@@ -5,11 +5,15 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
+if TYPE_CHECKING:
+    from rich.progress import TaskID
+
+from bloat_hunter.core.parallel import ParallelConfig, parallel_map
 from bloat_hunter.patterns import get_all_patterns, BloatPattern
 from bloat_hunter.safety.protected import is_protected_path
 
@@ -136,10 +140,16 @@ def get_directory_size(path: Path) -> tuple[int, int]:
 class Scanner:
     """Scans directories for bloat and caches."""
 
-    def __init__(self, console: Optional[Console] = None, min_size: int = 0):
+    def __init__(
+        self,
+        console: Optional[Console] = None,
+        min_size: int = 0,
+        parallel_config: Optional[ParallelConfig] = None,
+    ):
         self.console = console or Console()
         self.patterns = get_all_patterns()
         self.min_size = min_size
+        self.parallel_config = parallel_config or ParallelConfig()
 
     def scan(self, root: Path, deep: bool = False) -> ScanResult:
         """
@@ -153,7 +163,21 @@ class Scanner:
             ScanResult with all detected targets
         """
         result = ScanResult(root_path=root)
+        matches: list[tuple[Path, BloatPattern]] = []
 
+        # Phase 1: Find all matching directories
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=self.console,
+        ) as progress:
+            task = progress.add_task("Scanning for bloat...", total=None)
+            self._collect_matches(root, matches, result, progress, task, depth=0, max_depth=10 if deep else 5)
+
+        if not matches:
+            return result
+
+        # Phase 2: Calculate sizes in parallel
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -161,9 +185,33 @@ class Scanner:
             TaskProgressColumn(),
             console=self.console,
         ) as progress:
-            task = progress.add_task("Scanning for bloat...", total=None)
+            task = progress.add_task("Calculating sizes...", total=len(matches))
 
-            self._scan_directory(root, result, progress, task, depth=0, max_depth=10 if deep else 5)
+            def calc_size(item: tuple[Path, BloatPattern]) -> tuple[Path, BloatPattern, int, int]:
+                """Calculate size for a matched directory."""
+                path, pattern = item
+                size, count = get_directory_size(path)
+                return (path, pattern, size, count)
+
+            for item, size_result, error in parallel_map(
+                calc_size, matches, self.parallel_config
+            ):
+                path, pattern = item
+                progress.update(task, description=f"Sizing: {path.name[:40]}")
+
+                if error is None and size_result is not None:
+                    _, _, size, count = size_result
+                    # Only add if size meets minimum thresholds (pattern + user)
+                    if size > 0 and size >= pattern.min_size and size >= self.min_size:
+                        target = BloatTarget(
+                            path=path,
+                            pattern=pattern,
+                            size_bytes=size,
+                            file_count=count,
+                        )
+                        result.targets.append(target)
+
+                progress.advance(task)
 
         # Sort by size descending
         result.targets.sort(key=lambda t: t.size_bytes, reverse=True)
@@ -171,16 +219,17 @@ class Scanner:
 
         return result
 
-    def _scan_directory(
+    def _collect_matches(
         self,
         path: Path,
+        matches: list[tuple[Path, BloatPattern]],
         result: ScanResult,
         progress: Progress,
-        task_id: int,
+        task_id: "TaskID",
         depth: int,
         max_depth: int,
     ) -> None:
-        """Recursively scan a directory."""
+        """Recursively collect matching directories without calculating sizes."""
         if depth > max_depth:
             return
 
@@ -200,22 +249,13 @@ class Scanner:
                     matched_pattern = self._match_pattern(entry_path)
 
                     if matched_pattern:
-                        # Found bloat - calculate size and add to results
-                        size, count = get_directory_size(entry_path)
-                        # Only add if size meets minimum thresholds (pattern + user)
-                        if size > 0 and size >= matched_pattern.min_size and size >= self.min_size:
-                            target = BloatTarget(
-                                path=entry_path,
-                                pattern=matched_pattern,
-                                size_bytes=size,
-                                file_count=count,
-                            )
-                            result.targets.append(target)
+                        # Found bloat - add to matches for later size calculation
+                        matches.append((entry_path, matched_pattern))
                         # Don't recurse into matched directories
                     else:
                         # Recurse into subdirectory
-                        self._scan_directory(
-                            entry_path, result, progress, task_id, depth + 1, max_depth
+                        self._collect_matches(
+                            entry_path, matches, result, progress, task_id, depth + 1, max_depth
                         )
 
         except (PermissionError, OSError) as e:

@@ -31,6 +31,7 @@ from bloat_hunter.core.package_scanner import (
     PackageManagerConfig,
     PackageScanner,
 )
+from bloat_hunter.core.parallel import DEFAULT_WORKERS, ParallelConfig
 from bloat_hunter.core.scanner import BloatTarget, Scanner, ScanResult, parse_size
 from bloat_hunter.platform.detect import PlatformInfo, get_platform_info
 from bloat_hunter.ui.console import create_console, print_banner
@@ -144,6 +145,21 @@ FORMAT_OPTION = typer.Option(
     "--format",
     "-f",
     help="Output format: json or csv (auto-detected from --output extension if not specified)",
+)
+
+PARALLEL_OPTION = typer.Option(
+    True,
+    "--parallel/--no-parallel",
+    help="Enable parallel processing for faster scans (default: parallel)",
+)
+
+WORKERS_OPTION = typer.Option(
+    DEFAULT_WORKERS,
+    "--workers",
+    "-w",
+    help=f"Number of parallel workers (default: {DEFAULT_WORKERS})",
+    min=1,
+    max=32,
 )
 
 VALID_EXPORT_FORMATS = ("json", "csv")
@@ -352,6 +368,8 @@ def scan(
         "-s",
         help="Minimum size to report (e.g., 1MB, 10MB, 100MB)",
     ),
+    parallel: bool = PARALLEL_OPTION,
+    workers: int = WORKERS_OPTION,
     output: Path | None = OUTPUT_OPTION,
     fmt: str | None = FORMAT_OPTION,
 ) -> None:
@@ -359,13 +377,14 @@ def scan(
     print_banner(console)
 
     min_size_bytes = _parse_min_size(min_size)
+    parallel_config = ParallelConfig(enabled=parallel, max_workers=workers)
 
     _print_platform_header()
     if min_size_bytes > 0:
         console.print(f"[dim]Minimum size: {min_size}[/dim]")
     console.print()
 
-    scanner = Scanner(console=console, min_size=min_size_bytes)
+    scanner = Scanner(console=console, min_size=min_size_bytes, parallel_config=parallel_config)
     results = scanner.scan(path, deep=deep)
 
     analyzer = Analyzer(console=console)
@@ -393,16 +412,19 @@ def clean(
         "-s",
         help="Minimum size to report (e.g., 1MB, 10MB, 100MB)",
     ),
+    parallel: bool = PARALLEL_OPTION,
+    workers: int = WORKERS_OPTION,
 ) -> None:
     """Clean up bloat and caches from a directory."""
     print_banner(console)
 
     min_size_bytes = _parse_min_size(min_size)
+    parallel_config = ParallelConfig(enabled=parallel, max_workers=workers)
 
     if min_size_bytes > 0:
         console.print(f"[dim]Minimum size: {min_size}[/dim]")
 
-    scanner = Scanner(console=console, min_size=min_size_bytes)
+    scanner = Scanner(console=console, min_size=min_size_bytes, parallel_config=parallel_config)
     results = scanner.scan(path, deep=True)
 
     if not results.targets:
@@ -450,6 +472,8 @@ def duplicates(
         help="Show all duplicate groups (default: top 20)",
     ),
     interactive: bool = INTERACTIVE_OPTION,
+    parallel: bool = PARALLEL_OPTION,
+    workers: int = WORKERS_OPTION,
     output: Path | None = OUTPUT_OPTION,
     fmt: str | None = FORMAT_OPTION,
 ) -> None:
@@ -465,13 +489,16 @@ def duplicates(
     keep_strategy = cast(KeepStrategy, keep)
 
     min_size_bytes = _parse_min_size(min_size)
+    parallel_config = ParallelConfig(enabled=parallel, max_workers=workers)
 
     _print_platform_header()
     console.print(f"[dim]Minimum file size: {min_size}[/dim]")
     console.print()
 
     # Scan for duplicates
-    scanner = DuplicateScanner(console=console, min_size=min_size_bytes)
+    scanner = DuplicateScanner(
+        console=console, min_size=min_size_bytes, parallel_config=parallel_config
+    )
     results = scanner.scan(path)
 
     # Display results
@@ -524,6 +551,8 @@ def caches(
         "-a",
         help="Show all findings, not just top offenders",
     ),
+    parallel: bool = PARALLEL_OPTION,
+    workers: int = WORKERS_OPTION,
     output: Path | None = OUTPUT_OPTION,
     fmt: str | None = FORMAT_OPTION,
 ) -> None:
@@ -532,11 +561,14 @@ def caches(
     platform_info = _print_platform_header(wsl_windows=wsl_windows)
     console.print()
 
+    parallel_config = ParallelConfig(enabled=parallel, max_workers=workers)
+
     scanner = CacheScanner(
         console=console,
         include_browsers=browsers,
         include_package_managers=packages,
         include_apps=apps,
+        parallel_config=parallel_config,
     )
 
     results = scanner.scan(wsl_include_windows=wsl_windows)
@@ -602,6 +634,8 @@ def packages(
         "-a",
         help="Show all findings, not just top offenders",
     ),
+    parallel: bool = PARALLEL_OPTION,
+    workers: int = WORKERS_OPTION,
     output: Path | None = OUTPUT_OPTION,
     fmt: str | None = FORMAT_OPTION,
 ) -> None:
@@ -609,6 +643,8 @@ def packages(
     print_banner(console)
     _print_platform_header(wsl_windows=wsl_windows)
     console.print()
+
+    parallel_config = ParallelConfig(enabled=parallel, max_workers=workers)
 
     config = PackageManagerConfig(
         npm=npm,
@@ -623,7 +659,7 @@ def packages(
         nuget=nuget,
         bundler=bundler,
     )
-    scanner = PackageScanner(console=console, config=config)
+    scanner = PackageScanner(console=console, config=config, parallel_config=parallel_config)
 
     results = scanner.scan(wsl_include_windows=wsl_windows)
 

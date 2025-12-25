@@ -16,6 +16,7 @@ from rich.progress import (
     TaskProgressColumn,
 )
 
+from bloat_hunter.core.parallel import ParallelConfig, parallel_map
 from bloat_hunter.platform.detect import (
     get_platform_info,
     get_all_cache_paths,
@@ -51,12 +52,14 @@ class CacheScanner:
         include_browsers: bool = True,
         include_package_managers: bool = True,
         include_apps: bool = True,
+        parallel_config: Optional[ParallelConfig] = None,
     ):
         self.console = console or Console()
         self.include_browsers = include_browsers
         self.include_package_managers = include_package_managers
         self.include_apps = include_apps
         self.patterns = get_system_cache_patterns()
+        self.parallel_config = parallel_config or ParallelConfig()
 
     def scan(self, wsl_include_windows: bool = True) -> CacheScanResult:
         """
@@ -102,6 +105,9 @@ class CacheScanner:
         if not paths_to_scan:
             return result
 
+        # Phase 1: Collect all matching paths
+        matches: list[tuple[Path, BloatPattern]] = []
+
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -117,12 +123,52 @@ class CacheScanner:
                 progress.update(task, description=f"Scanning: {cache_path.name}")
 
                 try:
-                    self._scan_directory(cache_path, result, depth=0)
+                    self._collect_matches(cache_path, matches, result, depth=0)
                     result.categories_scanned[category] = (
                         result.categories_scanned.get(category, 0) + 1
                     )
                 except Exception as e:
                     result.scan_errors.append(f"{cache_path}: {e}")
+
+                progress.advance(task)
+
+        if not matches:
+            return result
+
+        # Phase 2: Calculate sizes in parallel
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=self.console,
+        ) as progress:
+            task = progress.add_task("Calculating sizes...", total=len(matches))
+
+            def calc_target(item: tuple[Path, BloatPattern]) -> BloatTarget | None:
+                """Create target with size calculation."""
+                path, pattern = item
+                try:
+                    size, count = get_directory_size(path)
+                    if size >= pattern.min_size:
+                        return BloatTarget(
+                            path=path,
+                            pattern=pattern,
+                            size_bytes=size,
+                            file_count=count,
+                        )
+                except (PermissionError, OSError):
+                    pass
+                return None
+
+            for item, target, error in parallel_map(
+                calc_target, matches, self.parallel_config
+            ):
+                path, _ = item
+                progress.update(task, description=f"Sizing: {path.name[:40]}")
+
+                if error is None and target is not None:
+                    result.targets.append(target)
 
                 progress.advance(task)
 
@@ -136,19 +182,21 @@ class CacheScanner:
 
         return result
 
-    def _scan_directory(
+    def _collect_matches(
         self,
         path: Path,
+        matches: list[tuple[Path, BloatPattern]],
         result: CacheScanResult,
         depth: int = 0,
         max_depth: int = 3,
     ) -> None:
         """
-        Recursively scan a directory for cache patterns.
+        Recursively collect matching cache directories without calculating sizes.
 
         Args:
             path: Directory path to scan
-            result: CacheScanResult to populate with targets
+            matches: List to append (path, pattern) tuples to
+            result: CacheScanResult for error tracking
             depth: Current recursion depth (0 = root)
             max_depth: Maximum recursion depth
         """
@@ -159,9 +207,7 @@ class CacheScanner:
         if depth == 0:
             matched = self._match_against_patterns(path)
             if matched:
-                target = self._create_target(path, matched)
-                if target:
-                    result.targets.append(target)
+                matches.append((path, matched))
                 return
 
         # Don't recurse beyond max_depth
@@ -182,13 +228,11 @@ class CacheScanner:
 
                     matched = self._match_against_patterns(entry_path)
                     if matched:
-                        target = self._create_target(entry_path, matched)
-                        if target:
-                            result.targets.append(target)
+                        matches.append((entry_path, matched))
                     else:
                         # Recurse deeper for nested caches
-                        self._scan_directory(
-                            entry_path, result, depth + 1, max_depth
+                        self._collect_matches(
+                            entry_path, matches, result, depth + 1, max_depth
                         )
 
         except (PermissionError, OSError) as e:

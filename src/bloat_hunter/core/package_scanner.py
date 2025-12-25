@@ -16,6 +16,7 @@ from rich.progress import (
     TextColumn,
 )
 
+from bloat_hunter.core.parallel import ParallelConfig, parallel_map
 from bloat_hunter.core.scanner import BloatTarget, format_size, get_directory_size
 from bloat_hunter.patterns.base import BloatPattern
 from bloat_hunter.patterns.browser_cache import PACKAGE_MANAGER_PATTERNS
@@ -119,6 +120,7 @@ class PackageScanner:
         self,
         console: Console | None = None,
         config: PackageManagerConfig | None = None,
+        parallel_config: ParallelConfig | None = None,
     ):
         self.console = console or Console()
         if config is None:
@@ -137,6 +139,7 @@ class PackageScanner:
             "bundler": config.bundler,
         }
         self.patterns = self._filter_patterns()
+        self.parallel_config = parallel_config or ParallelConfig()
 
     def _filter_patterns(self) -> list[BloatPattern]:
         """Filter patterns based on included package managers."""
@@ -166,6 +169,9 @@ class PackageScanner:
         self, result: PackageScanResult, paths_to_scan: list[Path]
     ) -> None:
         """Scan directories and collect targets with progress display."""
+        # Phase 1: Collect all matching paths
+        matches: list[tuple[Path, BloatPattern]] = []
+
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -181,9 +187,49 @@ class PackageScanner:
                 progress.update(task, description=f"Scanning: {cache_path.name}")
 
                 try:
-                    self._scan_directory(cache_path, result, depth=0)
+                    self._collect_matches(cache_path, matches, result, depth=0)
                 except FILESYSTEM_ERRORS as e:
                     result.scan_errors.append(f"{cache_path}: {e}")
+
+                progress.advance(task)
+
+        if not matches:
+            return
+
+        # Phase 2: Calculate sizes in parallel
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=self.console,
+        ) as progress:
+            task = progress.add_task("Calculating sizes...", total=len(matches))
+
+            def calc_target(item: tuple[Path, BloatPattern]) -> BloatTarget | None:
+                """Create target with size calculation."""
+                path, pattern = item
+                try:
+                    size, count = get_directory_size(path)
+                    if size >= pattern.min_size:
+                        return BloatTarget(
+                            path=path,
+                            pattern=pattern,
+                            size_bytes=size,
+                            file_count=count,
+                        )
+                except FILESYSTEM_ERRORS as e:
+                    logger.debug("Failed to get size for %s: %s", path, e)
+                return None
+
+            for item, target, error in parallel_map(
+                calc_target, matches, self.parallel_config
+            ):
+                path, _ = item
+                progress.update(task, description=f"Sizing: {path.name[:40]}")
+
+                if error is None and target is not None:
+                    result.targets.append(target)
 
                 progress.advance(task)
 
@@ -243,19 +289,21 @@ class PackageScanner:
 
         return result
 
-    def _scan_directory(
+    def _collect_matches(
         self,
         path: Path,
+        matches: list[tuple[Path, BloatPattern]],
         result: PackageScanResult,
         depth: int = 0,
         max_depth: int = 3,
     ) -> None:
         """
-        Recursively scan a directory for package manager cache patterns.
+        Recursively collect matching package manager cache directories.
 
         Args:
             path: Directory path to scan
-            result: PackageScanResult to populate with targets
+            matches: List to append (path, pattern) tuples to
+            result: PackageScanResult for error tracking
             depth: Current recursion depth (0 = root)
             max_depth: Maximum recursion depth
         """
@@ -266,9 +314,7 @@ class PackageScanner:
         if depth == 0:
             matched = self._match_against_patterns(path)
             if matched:
-                target = self._create_target(path, matched)
-                if target:
-                    result.targets.append(target)
+                matches.append((path, matched))
                 return
 
         # Don't recurse beyond max_depth
@@ -289,12 +335,10 @@ class PackageScanner:
 
                     matched = self._match_against_patterns(entry_path)
                     if matched:
-                        target = self._create_target(entry_path, matched)
-                        if target:
-                            result.targets.append(target)
+                        matches.append((entry_path, matched))
                     else:
                         # Recurse deeper for nested caches
-                        self._scan_directory(entry_path, result, depth + 1, max_depth)
+                        self._collect_matches(entry_path, matches, result, depth + 1, max_depth)
 
         except FILESYSTEM_ERRORS as e:
             result.scan_errors.append(f"{path}: {e}")
