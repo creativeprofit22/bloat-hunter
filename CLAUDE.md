@@ -13,12 +13,13 @@ Files:
   - src/bloat_hunter/cli.py
 
 ## Pipeline State
-Phase: debugging
+Phase: refactoring
 Feature: Parallel Scanning
 Tier: medium
 Tier-Status: pending
 Reports:
   - bugs: reports/bugs-parallel-scanning.md
+  - refactors: reports/refactors-parallel-scanning.md
 
 ## Feature Backlog
 High Priority:
@@ -47,12 +48,16 @@ bloat-hunter config show
 ```
 
 ## Last Session (2025-12-25)
-Fixed high priority bugs from parallel scanning bug hunt:
-- scanner.py: Fixed format_size type mutation (use local float variable)
-- cache_scanner.py: Changed broad `except Exception` to `(PermissionError, OSError)`
-- Committed and pushed: 345ff67
+Completed high priority refactors for parallel scanning:
+- Extracted `calc_target` to shared function in scanner.py
+- Added `match_patterns` utility consolidating pattern matching
+- Added `collect_pattern_matches` with callback for shared collection logic
+- Modernized type hints from Optional[X] to X | None
+- Removed unused imports from cache_scanner.py and package_scanner.py
+- Commit: d8775fa pushed to main
 
 ## Next Steps
-1. Fix medium priority bugs (dead code removal, empty list check)
-2. Fix low priority bugs (code duplication, long line)
+1. Execute medium priority refactors from refactor report
+2. Execute low priority refactors from refactor report
 3. Windows native testing
+4. Interactive TUI - full-screen mode

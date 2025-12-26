@@ -167,6 +167,21 @@ def calc_target(item: tuple[Path, BloatPattern]) -> BloatTarget | None:
     return None
 
 
+def calc_size(item: tuple[Path, BloatPattern]) -> tuple[Path, BloatPattern, int, int]:
+    """
+    Calculate size for a matched directory.
+
+    Args:
+        item: Tuple of (path, pattern) to calculate size for
+
+    Returns:
+        Tuple of (path, pattern, size_bytes, file_count)
+    """
+    path, pattern = item
+    size, count = get_directory_size(path)
+    return (path, pattern, size, count)
+
+
 def match_patterns(
     path: Path,
     patterns: list[BloatPattern],
@@ -303,12 +318,6 @@ class Scanner:
             console=self.console,
         ) as progress:
             task = progress.add_task("Calculating sizes...", total=len(matches))
-
-            def calc_size(item: tuple[Path, BloatPattern]) -> tuple[Path, BloatPattern, int, int]:
-                """Calculate size for a matched directory."""
-                path, pattern = item
-                size, count = get_directory_size(path)
-                return (path, pattern, size, count)
 
             for item, size_result, error in parallel_map(
                 calc_size, matches, self.parallel_config

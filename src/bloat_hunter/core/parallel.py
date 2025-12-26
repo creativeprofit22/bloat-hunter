@@ -6,7 +6,6 @@ import os
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TypeVar
 
 T = TypeVar("T")
@@ -122,28 +121,3 @@ def parallel_map_ordered(
                     results[idx] = (item, None, e)
 
     return results  # type: ignore[return-value]
-
-
-def get_directory_sizes_parallel(
-    paths: list[Path],
-    size_func: Callable[[Path], tuple[int, int]],
-    config: ParallelConfig | None = None,
-) -> dict[Path, tuple[int, int]]:
-    """
-    Calculate directory sizes for multiple paths in parallel.
-
-    Args:
-        paths: List of directory paths to size
-        size_func: Function that returns (size_bytes, file_count) for a path
-        config: Parallel execution configuration
-
-    Returns:
-        Dict mapping path to (size_bytes, file_count). Paths that failed are omitted.
-    """
-    results: dict[Path, tuple[int, int]] = {}
-
-    for path, size_result, error in parallel_map(size_func, paths, config):
-        if error is None and size_result is not None:
-            results[path] = size_result
-
-    return results

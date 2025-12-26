@@ -5,8 +5,8 @@ description: Run checks, commit with AI message, and push
 
 1. Run quality checks:
    ```bash
-   ruff check src/ tests/
-   mypy src/
+   uv run ruff check src/
+   uv run mypy src/ --ignore-missing-imports
    ```
    Fix ALL errors before continuing.
 

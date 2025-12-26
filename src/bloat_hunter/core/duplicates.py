@@ -129,6 +129,10 @@ def _get_hasher() -> Callable[[], Hasher]:
         return lambda: hashlib.blake2b(digest_size=8)
 
 
+# Cache hasher factory at module level to avoid re-checking imports on each call
+_hasher_factory: Callable[[], Hasher] = _get_hasher()
+
+
 def hash_file(path: Path) -> Optional[str]:
     """
     Hash a file's contents.
@@ -139,8 +143,7 @@ def hash_file(path: Path) -> Optional[str]:
     Returns:
         Hex digest of the file, or None if file cannot be read.
     """
-    hasher_factory = _get_hasher()
-    hasher = hasher_factory()
+    hasher = _hasher_factory()
 
     try:
         with open(path, "rb") as f:
@@ -149,6 +152,25 @@ def hash_file(path: Path) -> Optional[str]:
         return hasher.hexdigest()
     except (PermissionError, OSError):
         return None
+
+
+def hash_candidate(item: tuple[int, Path]) -> tuple[int, Path, str | None, float]:
+    """
+    Hash a single file and return metadata.
+
+    Args:
+        item: Tuple of (size_bytes, path) to hash
+
+    Returns:
+        Tuple of (size_bytes, path, file_hash, mtime)
+    """
+    size, path = item
+    file_hash = hash_file(path)
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        mtime = 0.0
+    return (size, path, file_hash, mtime)
 
 
 class DuplicateScanner:
@@ -218,17 +240,6 @@ class DuplicateScanner:
             task = progress.add_task("Hashing candidates...", total=total_candidates)
 
             hash_groups: dict[str, DuplicateGroup] = {}
-
-            # Hash files in parallel
-            def hash_candidate(item: tuple[int, Path]) -> tuple[int, Path, str | None, float]:
-                """Hash a single file and return metadata."""
-                size, path = item
-                file_hash = hash_file(path)
-                try:
-                    mtime = path.stat().st_mtime
-                except OSError:
-                    mtime = 0.0
-                return (size, path, file_hash, mtime)
 
             for item, hash_result, error in parallel_map(
                 hash_candidate, candidates, self.parallel_config

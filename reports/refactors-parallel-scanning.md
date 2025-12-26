@@ -20,12 +20,12 @@ Files analyzed:
 | 2 | scanner.py:193-251 | `_collect_matches` method nearly identical between CacheScanner and PackageScanner | Extracted to `collect_pattern_matches` shared function | M | ✅ Done |
 | 3 | scanner.py:168-190 | Pattern matching methods `_match_pattern` / `_match_against_patterns` have same structure | Consolidated into `match_patterns` utility function | S | ✅ Done |
 
-## Medium Priority (Code Clarity)
-| # | Location | Issue | Suggested Fix | Effort |
-|---|----------|-------|---------------|--------|
-| 1 | parallel.py:127-149 | `get_directory_sizes_parallel` function defined but never called in codebase | Remove if unused, or document intended use | S |
-| 2 | duplicates.py:142-143 | `_get_hasher()` called on every `hash_file` invocation, recreates factory each time | Cache hasher factory at module level | S |
-| 3 | scanner.py:194-198, duplicates.py:223-231, cache_scanner.py:148-162 | Inline functions (`calc_size`, `hash_candidate`, `calc_target`) defined inside methods | Extract as module-level or class methods for testability | M |
+## Medium Priority (Code Clarity) - COMPLETED 2025-12-25
+| # | Location | Issue | Suggested Fix | Effort | Status |
+|---|----------|-------|---------------|--------|--------|
+| 1 | parallel.py:127-149 | `get_directory_sizes_parallel` function defined but never called in codebase | Removed unused function | S | ✅ Done |
+| 2 | duplicates.py:142-143 | `_get_hasher()` called on every `hash_file` invocation, recreates factory each time | Cached `_hasher_factory` at module level | S | ✅ Done |
+| 3 | scanner.py:194-198, duplicates.py:223-231 | Inline functions (`calc_size`, `hash_candidate`) defined inside methods | Extracted to module-level functions | M | ✅ Done |
 
 ## Low Priority (Nice-to-Have)
 | # | Location | Issue | Suggested Fix | Effort |
