@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -17,7 +16,13 @@ from rich.progress import (
 )
 
 from bloat_hunter.core.parallel import ParallelConfig, parallel_map
-from bloat_hunter.core.scanner import BloatTarget, format_size, get_directory_size
+from bloat_hunter.core.scanner import (
+    BloatTarget,
+    calc_target,
+    collect_pattern_matches,
+    format_size,
+    match_patterns,
+)
 from bloat_hunter.patterns.base import BloatPattern
 from bloat_hunter.patterns.browser_cache import PACKAGE_MANAGER_PATTERNS
 from bloat_hunter.platform.detect import (
@@ -25,12 +30,8 @@ from bloat_hunter.platform.detect import (
     get_all_cache_paths,
     get_platform_info,
 )
-from bloat_hunter.safety.protected import is_protected_path
 
 logger = logging.getLogger(__name__)
-
-# Common filesystem errors to catch during scanning
-FILESYSTEM_ERRORS = (PermissionError, OSError)
 
 
 @dataclass
@@ -188,7 +189,7 @@ class PackageScanner:
 
                 try:
                     self._collect_matches(cache_path, matches, result, depth=0)
-                except FILESYSTEM_ERRORS as e:
+                except (PermissionError, OSError) as e:
                     result.scan_errors.append(f"{cache_path}: {e}")
 
                 progress.advance(task)
@@ -205,22 +206,6 @@ class PackageScanner:
             console=self.console,
         ) as progress:
             task = progress.add_task("Calculating sizes...", total=len(matches))
-
-            def calc_target(item: tuple[Path, BloatPattern]) -> BloatTarget | None:
-                """Create target with size calculation."""
-                path, pattern = item
-                try:
-                    size, count = get_directory_size(path)
-                    if size >= pattern.min_size:
-                        return BloatTarget(
-                            path=path,
-                            pattern=pattern,
-                            size_bytes=size,
-                            file_count=count,
-                        )
-                except FILESYSTEM_ERRORS as e:
-                    logger.debug("Failed to get size for %s: %s", path, e)
-                return None
 
             for item, target, error in parallel_map(
                 calc_target, matches, self.parallel_config
@@ -297,65 +282,20 @@ class PackageScanner:
         depth: int = 0,
         max_depth: int = 3,
     ) -> None:
-        """
-        Recursively collect matching package manager cache directories.
-
-        Args:
-            path: Directory path to scan
-            matches: List to append (path, pattern) tuples to
-            result: PackageScanResult for error tracking
-            depth: Current recursion depth (0 = root)
-            max_depth: Maximum recursion depth
-        """
-        if is_protected_path(path, for_scanning=True):
-            return
-
-        # At depth=0, try to match the root itself first
-        if depth == 0:
-            matched = self._match_against_patterns(path)
-            if matched:
-                matches.append((path, matched))
-                return
-
-        # Don't recurse beyond max_depth
-        if depth > max_depth:
-            return
-
-        # Scan subdirectories
-        try:
-            with os.scandir(path) as entries:
-                for entry in entries:
-                    if not entry.is_dir(follow_symlinks=False):
-                        continue
-
-                    entry_path = Path(entry.path)
-
-                    if is_protected_path(entry_path, for_scanning=True):
-                        continue
-
-                    matched = self._match_against_patterns(entry_path)
-                    if matched:
-                        matches.append((entry_path, matched))
-                    else:
-                        # Recurse deeper for nested caches
-                        self._collect_matches(entry_path, matches, result, depth + 1, max_depth)
-
-        except FILESYSTEM_ERRORS as e:
-            result.scan_errors.append(f"{path}: {e}")
+        """Collect matching package manager cache directories."""
+        collect_pattern_matches(
+            path, matches, result.scan_errors,
+            self._match_against_patterns, depth, max_depth
+        )
 
     def _match_against_patterns(self, path: Path) -> BloatPattern | None:
         """Check if path matches any package manager cache pattern."""
-        name = path.name
-
         # Special case for Maven: "repository" is too generic, so validate parent
         if (
             self._include.get("maven", True)
-            and name == "repository"
+            and path.name == "repository"
             and path.parent.name == ".m2"
         ):
             return MAVEN_PATTERN
 
-        for pattern in self.patterns:
-            if pattern.matches(name, path):
-                return pattern
-        return None
+        return match_patterns(path, self.patterns)

@@ -5,13 +5,15 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 
 if TYPE_CHECKING:
     from rich.progress import TaskID
+
+from collections.abc import Callable
 
 from bloat_hunter.core.parallel import ParallelConfig, parallel_map
 from bloat_hunter.patterns import BloatPattern, get_all_patterns
@@ -138,14 +140,125 @@ def get_directory_size(path: Path) -> tuple[int, int]:
     return total_size, file_count
 
 
+def calc_target(item: tuple[Path, BloatPattern]) -> BloatTarget | None:
+    """
+    Create a BloatTarget with size calculation for a matched path.
+
+    Shared utility for cache_scanner and package_scanner.
+
+    Args:
+        item: Tuple of (path, pattern) to calculate size for
+
+    Returns:
+        BloatTarget if size meets pattern minimum, None otherwise
+    """
+    path, pattern = item
+    try:
+        size, count = get_directory_size(path)
+        if size >= pattern.min_size:
+            return BloatTarget(
+                path=path,
+                pattern=pattern,
+                size_bytes=size,
+                file_count=count,
+            )
+    except (PermissionError, OSError):
+        pass
+    return None
+
+
+def match_patterns(
+    path: Path,
+    patterns: list[BloatPattern],
+) -> BloatPattern | None:
+    """
+    Check if a path matches any pattern in the list.
+
+    Shared utility for all scanners.
+
+    Args:
+        path: Directory path to check
+        patterns: List of patterns to match against
+
+    Returns:
+        First matching pattern, or None if no match
+    """
+    name = path.name
+    for pattern in patterns:
+        if pattern.matches(name, path):
+            return pattern
+    return None
+
+
+def collect_pattern_matches(
+    path: Path,
+    matches: list[tuple[Path, BloatPattern]],
+    scan_errors: list[str],
+    pattern_matcher: Callable[[Path], BloatPattern | None],
+    depth: int = 0,
+    max_depth: int = 3,
+) -> None:
+    """
+    Recursively collect pattern matches from a directory tree.
+
+    Shared utility for cache_scanner and package_scanner.
+
+    Args:
+        path: Directory path to scan
+        matches: List to append (path, pattern) tuples to
+        scan_errors: List to append error messages to
+        pattern_matcher: Callback to match a path against patterns
+        depth: Current recursion depth (0 = root)
+        max_depth: Maximum recursion depth
+    """
+    if is_protected_path(path, for_scanning=True):
+        return
+
+    # At depth=0, try to match the root itself first
+    if depth == 0:
+        matched = pattern_matcher(path)
+        if matched:
+            matches.append((path, matched))
+            return
+
+    # Don't recurse beyond max_depth
+    if depth > max_depth:
+        return
+
+    # Scan subdirectories
+    try:
+        with os.scandir(path) as entries:
+            for entry in entries:
+                if not entry.is_dir(follow_symlinks=False):
+                    continue
+
+                entry_path = Path(entry.path)
+
+                if is_protected_path(entry_path, for_scanning=True):
+                    continue
+
+                matched = pattern_matcher(entry_path)
+                if matched:
+                    matches.append((entry_path, matched))
+                else:
+                    # Recurse deeper for nested caches
+                    collect_pattern_matches(
+                        entry_path, matches, scan_errors, pattern_matcher,
+                        depth + 1, max_depth
+                    )
+
+    except (PermissionError, OSError) as e:
+        scan_errors.append(f"{path}: {e}")
+
+
 class Scanner:
     """Scans directories for bloat and caches."""
 
     def __init__(
         self,
-        console: Optional[Console] = None,
+        console: Console | None = None,
         min_size: int = 0,
-        parallel_config: Optional[ParallelConfig] = None,
+        parallel_config: ParallelConfig | None = None,
     ):
         self.console = console or Console()
         self.patterns = get_all_patterns()
@@ -265,12 +378,6 @@ class Scanner:
         except (PermissionError, OSError) as e:
             result.scan_errors.append(f"{path}: {e}")
 
-    def _match_pattern(self, path: Path) -> Optional[BloatPattern]:
+    def _match_pattern(self, path: Path) -> BloatPattern | None:
         """Check if a path matches any bloat pattern."""
-        name = path.name
-
-        for pattern in self.patterns:
-            if pattern.matches(name, path):
-                return pattern
-
-        return None
+        return match_patterns(path, self.patterns)
