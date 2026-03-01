@@ -10,39 +10,56 @@ export interface WorkerCallbacks {
   onCancelled: (scannerType: ScannerType) => void;
 }
 
+/** Grace period before force-terminating a cancelled worker (ms). */
+const CANCEL_TIMEOUT_MS = 5000;
+
 /**
  * Manages worker threads for scanner operations.
  * Spawns one worker per scan, tracks active workers, handles cancellation.
  */
 export class WorkerManager {
   private workers = new Map<ScannerType, Worker>();
+  private cancelTimeouts = new Map<ScannerType, ReturnType<typeof setTimeout>>();
 
   /**
    * Resolve the path to the compiled scanner-worker.js.
-   * In both dev and packaged modes, the worker is compiled alongside
-   * the main process bundle in the same directory.
-   *
-   * Note: For ASAR-packed apps, scanner-worker.js must be listed in
-   * electron-builder's asar.unpacked config since worker_threads
-   * cannot load scripts from inside an ASAR archive.
+   * In packaged builds the worker is unpacked outside the ASAR archive
+   * (worker_threads cannot load scripts from inside an ASAR).
    */
   private getWorkerPath(): string {
     if (app.isPackaged) {
-      // In packaged app, resolve relative to the app's root
-      return path.join(app.getAppPath(), 'dist', 'main', 'scanner-worker.js');
+      // asarUnpack places the file at app.asar.unpacked/dist/main/scanner-worker.js
+      return path.join(
+        app.getAppPath().replace('app.asar', 'app.asar.unpacked'),
+        'dist',
+        'main',
+        'scanner-worker.js',
+      );
     }
     // In dev mode, esbuild compiles the worker to dist/main/
     return path.join(__dirname, 'scanner-worker.js');
   }
 
+  /** Clear any pending cancel timeout for a scanner type. */
+  private clearCancelTimeout(scannerType: ScannerType): void {
+    const timeout = this.cancelTimeouts.get(scannerType);
+    if (timeout) {
+      clearTimeout(timeout);
+      this.cancelTimeouts.delete(scannerType);
+    }
+  }
+
   /**
    * Start a scan in a worker thread.
-   * If a scan of the same type is already running, it is cancelled first.
+   * If a scan of the same type is already running, it is force-terminated first.
    */
   startScan(scannerType: ScannerType, config: ScannerConfig, callbacks: WorkerCallbacks): void {
-    // Cancel existing scan of same type if running
-    if (this.workers.has(scannerType)) {
-      this.cancelScan(scannerType);
+    // Force-terminate existing worker of same type — we're replacing it
+    const existing = this.workers.get(scannerType);
+    if (existing) {
+      this.clearCancelTimeout(scannerType);
+      existing.terminate();
+      this.workers.delete(scannerType);
     }
 
     const worker = new Worker(this.getWorkerPath(), {
@@ -65,6 +82,7 @@ export class WorkerManager {
           this.workers.delete(scannerType);
           break;
         case 'cancelled':
+          this.clearCancelTimeout(scannerType);
           callbacks.onCancelled(scannerType);
           this.workers.delete(scannerType);
           break;
@@ -72,42 +90,54 @@ export class WorkerManager {
     });
 
     worker.on('error', (err: Error) => {
-      callbacks.onError(scannerType, err.message);
-      this.workers.delete(scannerType);
+      // Only act if this worker is still the current one for this type
+      if (this.workers.get(scannerType) === worker) {
+        callbacks.onError(scannerType, err.message);
+        this.workers.delete(scannerType);
+      }
     });
 
     worker.on('exit', (code) => {
-      // Only report if the worker exited abnormally and we haven't
-      // already handled it via a message event
-      if (code !== 0 && this.workers.has(scannerType)) {
+      // Only report if this specific worker exited abnormally and is still tracked
+      if (code !== 0 && this.workers.get(scannerType) === worker) {
         callbacks.onError(scannerType, `Worker exited with code ${code}`);
         this.workers.delete(scannerType);
       }
     });
   }
 
-  /** Send a cancel request to the worker running the given scanner type. */
+  /**
+   * Send a cancel request to the worker running the given scanner type.
+   * If the worker doesn't respond within the grace period, it is force-terminated.
+   */
   cancelScan(scannerType: ScannerType): void {
     const worker = this.workers.get(scannerType);
     if (worker) {
       worker.postMessage({ type: 'cancel' });
-    }
-  }
 
-  /** Cancel all active scans. */
-  cancelAll(): void {
-    for (const [type] of this.workers) {
-      this.cancelScan(type);
+      // Force-terminate if cooperative cancel doesn't respond in time
+      this.clearCancelTimeout(scannerType);
+      this.cancelTimeouts.set(
+        scannerType,
+        setTimeout(() => {
+          if (this.workers.get(scannerType) === worker) {
+            worker.terminate();
+            // The 'exit' handler will clean up this.workers
+          }
+          this.cancelTimeouts.delete(scannerType);
+        }, CANCEL_TIMEOUT_MS),
+      );
     }
-  }
-
-  /** Check if a scan of the given type is currently running. */
-  isRunning(scannerType: ScannerType): boolean {
-    return this.workers.has(scannerType);
   }
 
   /** Forcefully terminate all workers. Call on app shutdown. */
   async terminateAll(): Promise<void> {
+    // Clear all pending cancel timeouts
+    for (const timeout of this.cancelTimeouts.values()) {
+      clearTimeout(timeout);
+    }
+    this.cancelTimeouts.clear();
+
     const terminations = [...this.workers.values()].map((w) => w.terminate());
     await Promise.all(terminations);
     this.workers.clear();

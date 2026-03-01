@@ -4,7 +4,6 @@ declare global {
   interface Window {
     electronAPI: {
       getAppVersion: () => Promise<string>;
-      getPlatform: () => Promise<string>;
       versions: {
         electron: string;
         node: string;
@@ -24,14 +23,6 @@ declare global {
         width: number;
         height: number;
         mime: string;
-      } | null>;
-      getFileStat: (filePath: string) => Promise<{
-        size: number;
-        created: number;
-        modified: number;
-        accessed: number;
-        isDirectory: boolean;
-        isFile: boolean;
       } | null>;
 
       // Settings
@@ -102,7 +93,6 @@ declare global {
       onScanProgress: (callback: (data: unknown) => void) => () => void;
       onScanResult: (callback: (data: unknown) => void) => () => void;
       onScanError: (callback: (data: unknown) => void) => () => void;
-      onScanComplete: (callback: (data: unknown) => void) => () => void;
       onScanCancelled: (callback: (data: unknown) => void) => () => void;
     };
   }

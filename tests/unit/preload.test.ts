@@ -47,12 +47,6 @@ describe('Preload Script', () => {
     expect(typeof api.getAppVersion).toBe('function');
   });
 
-  it('electronAPI has getPlatform method', async () => {
-    await loadPreload();
-    const api = getExposedApi();
-    expect(typeof api.getPlatform).toBe('function');
-  });
-
   it('electronAPI has versions object with expected keys', async () => {
     await loadPreload();
     const api = getExposedApi();
@@ -73,7 +67,6 @@ describe('Preload Script', () => {
     await loadPreload();
     const api = getExposedApi();
     expect(typeof api.generateThumbnail).toBe('function');
-    expect(typeof api.getFileStat).toBe('function');
   });
 
   it('electronAPI has cleaning methods', async () => {
@@ -116,13 +109,6 @@ describe('Preload Script', () => {
     const api = getExposedApi();
     (api.getAppVersion as () => void)();
     expect(mocks.invoke).toHaveBeenCalledWith('get-app-version');
-  });
-
-  it('getPlatform invokes correct IPC channel', async () => {
-    await loadPreload();
-    const api = getExposedApi();
-    (api.getPlatform as () => void)();
-    expect(mocks.invoke).toHaveBeenCalledWith('get-platform');
   });
 
   it('startScan invokes correct IPC channel with args', async () => {

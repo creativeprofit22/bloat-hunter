@@ -57,10 +57,12 @@ export function loadSettings(): AppSettings {
 }
 
 export function saveSettings(settings: AppSettings): void {
-  cached = settings;
   const dir = path.dirname(getSettingsPath());
   mkdirSync(dir, { recursive: true });
   writeFileSync(getSettingsPath(), JSON.stringify(settings, null, 2), 'utf-8');
+  // Only update cache after successful write — if writeFileSync throws,
+  // the cache stays at the previous value instead of diverging from disk.
+  cached = settings;
 }
 
 export function updateSettings(partial: Partial<AppSettings>): AppSettings {

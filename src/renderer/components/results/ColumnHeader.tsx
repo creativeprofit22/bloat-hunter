@@ -1,4 +1,4 @@
-export type SortField = 'name' | 'path' | 'size' | 'modified' | 'risk';
+export type SortField = 'name' | 'size' | 'modified' | 'risk';
 export type SortDirection = 'asc' | 'desc';
 
 interface ColumnHeaderProps {

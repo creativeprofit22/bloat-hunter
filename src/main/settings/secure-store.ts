@@ -70,9 +70,3 @@ export function hasApiKey(provider: string): boolean {
   const keys = readKeys();
   return provider in keys;
 }
-
-export function deleteApiKey(provider: string): void {
-  const keys = readKeys();
-  delete keys[provider];
-  writeKeys(keys);
-}

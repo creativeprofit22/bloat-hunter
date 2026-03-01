@@ -1,5 +1,5 @@
-import { rm, mkdir, rename, stat } from 'fs/promises';
-import { dirname, join, basename } from 'path';
+import { rm, mkdir, rename, stat, access } from 'fs/promises';
+import { dirname, join, basename, extname } from 'path';
 import { trashItem } from './recycle-bin';
 import { withServicesStopped, isAdmin } from './service-manager';
 import type {
@@ -17,6 +17,25 @@ export interface CleanOptions {
 }
 
 export type CleanProgressCallback = (progress: CleanProgressInfo) => void;
+
+/** Generate a unique destination path, appending (1), (2), etc. if name already exists. */
+async function uniqueDestPath(dir: string, fileName: string): Promise<string> {
+  const ext = extname(fileName);
+  const name = basename(fileName, ext);
+  let dest = join(dir, fileName);
+  let counter = 1;
+  for (;;) {
+    try {
+      await access(dest);
+      // File exists — try next suffix
+      dest = join(dir, `${name} (${counter})${ext}`);
+      counter++;
+    } catch {
+      // Doesn't exist — safe to use
+      return dest;
+    }
+  }
+}
 
 /**
  * Core cleaning engine. Processes a list of items using the specified action.
@@ -101,7 +120,7 @@ async function processItems(
           if (!options.moveTo) {
             throw new Error('Move destination not specified');
           }
-          const destPath = join(options.moveTo, basename(item.path));
+          const destPath = await uniqueDestPath(options.moveTo, basename(item.path));
           await mkdir(dirname(destPath), { recursive: true });
           await rename(item.path, destPath);
           break;

@@ -53,11 +53,6 @@ export function useScanner() {
       setError(payload.scannerType, payload.error);
     });
 
-    const unsubComplete = api.onScanComplete((data) => {
-      const payload = data as ScanResultPayload;
-      setResults(payload.scannerType, payload.results);
-    });
-
     const unsubCancelled = api.onScanCancelled((data) => {
       const payload = data as ScanCancelledPayload;
       setCancelled(payload.scannerType);
@@ -67,7 +62,6 @@ export function useScanner() {
       unsubProgress();
       unsubResult();
       unsubError();
-      unsubComplete();
       unsubCancelled();
     };
   }, [updateProgress, setResults, setError, setCancelled]);

@@ -1,4 +1,4 @@
-import type { AIProviderType, AIAdvice, AIProviderConfig, ScanResult } from '../scanners/types';
+import type { AIAdvice, AIProviderConfig, ScanResult } from '../scanners/types';
 import type { AIProvider, ProviderOptions } from './types';
 import { ClaudeProvider } from './providers/claude';
 import { OpenAIProvider } from './providers/openai';
@@ -33,14 +33,6 @@ export class Advisor {
 
   configure(config: AIProviderConfig): void {
     this.provider = createProvider(config);
-  }
-
-  get providerType(): AIProviderType {
-    return this.provider?.type ?? 'none';
-  }
-
-  get isConfigured(): boolean {
-    return this.provider !== null;
   }
 
   /** Analyze scan results and return structured advice */

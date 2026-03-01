@@ -227,13 +227,6 @@ export interface AIRecommendation {
 
 // ── IPC Message Types ────────────────────────────────────────────────
 
-export interface ScanRequest {
-  /** Which scanner to run */
-  scannerType: ScannerType;
-  /** Configuration for this scan */
-  config: ScannerConfig;
-}
-
 export interface WorkerMessage {
   type: 'progress' | 'result' | 'error' | 'cancelled';
   data: ScanProgress | ScanResult[] | string;

@@ -55,7 +55,7 @@ async function main() {
     bundle: true,
     platform: 'node',
     outfile: 'dist/main/scanner-worker.js',
-    external: ['electron'],
+    external: ['electron', 'xxhash-wasm'],
     sourcemap: true,
   });
   await workerCtx.watch();

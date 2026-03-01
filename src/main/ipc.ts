@@ -1,8 +1,8 @@
 import { ipcMain, app } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
-import { stat } from 'fs/promises';
 import sharp from 'sharp';
 import { WorkerManager } from './scanners/worker-manager';
+import { registerScanResults, isKnownScanResult } from './scanners/result-registry';
 import type {
   ScannerType,
   ScannerConfig,
@@ -17,6 +17,23 @@ import { advisor } from './ai/advisor';
 import { loadSettings, updateSettings, type AppSettings } from './settings/store';
 import { setApiKey, getApiKey, hasApiKey } from './settings/secure-store';
 
+const MAX_THUMBNAIL_SIZE = 1024;
+
+/** Only allow localhost URLs for Ollama baseUrl — block exfiltration via arbitrary endpoints. */
+function validateLocalUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+      return url;
+    }
+  } catch {
+    // invalid URL
+  }
+  return undefined;
+}
+
 const workerManager = new WorkerManager();
 
 export function registerIpcHandlers(): void {
@@ -24,10 +41,6 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('get-app-version', () => {
     return app.getVersion();
-  });
-
-  ipcMain.handle('get-platform', () => {
-    return process.platform;
   });
 
   // ── Scanner Control ─────────────────────────────────────────────────
@@ -44,6 +57,7 @@ export function registerIpcHandlers(): void {
           }
         },
         onResult: (type, results) => {
+          registerScanResults(results);
           if (!sender.isDestroyed()) {
             sender.send('scanner:result', { scannerType: type, results });
           }
@@ -71,13 +85,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'preview:thumbnail',
     async (_event: IpcMainInvokeEvent, filePath: string, maxSize: number) => {
+      if (!isKnownScanResult(filePath)) return null;
+
+      const clampedSize = Math.min(Math.max(1, maxSize), MAX_THUMBNAIL_SIZE);
       try {
         const image = sharp(filePath);
         const metadata = await image.metadata();
         const buf = await image
           .resize({
-            width: maxSize,
-            height: maxSize,
+            width: clampedSize,
+            height: clampedSize,
             fit: 'inside',
             withoutEnlargement: true,
           })
@@ -96,22 +113,6 @@ export function registerIpcHandlers(): void {
     },
   );
 
-  ipcMain.handle('preview:file-stat', async (_event: IpcMainInvokeEvent, filePath: string) => {
-    try {
-      const s = await stat(filePath);
-      return {
-        size: s.size,
-        created: s.birthtime.getTime(),
-        modified: s.mtime.getTime(),
-        accessed: s.atime.getTime(),
-        isDirectory: s.isDirectory(),
-        isFile: s.isFile(),
-      };
-    } catch {
-      return null;
-    }
-  });
-
   // ── Cleaning Actions ──────────────────────────────────────────────────
 
   ipcMain.handle(
@@ -122,9 +123,24 @@ export function registerIpcHandlers(): void {
       action: CleanAction,
       moveTo?: string,
     ) => {
+      // Only allow cleaning paths that were returned by a prior scan
+      const validatedItems = items.filter((item) => isKnownScanResult(item.path));
+      if (validatedItems.length === 0) {
+        return {
+          totalItems: 0,
+          successCount: 0,
+          failedCount: items.length,
+          bytesRecovered: 0,
+          errors: items.map((item) => ({
+            path: item.path,
+            message: 'Path was not found in scan results',
+          })),
+        };
+      }
+
       const sender = event.sender;
 
-      const result = await cleanItems(items, { action, moveTo }, (progress) => {
+      const result = await cleanItems(validatedItems, { action, moveTo }, (progress) => {
         if (!sender.isDestroyed()) {
           sender.send('clean:progress', progress);
         }
@@ -162,11 +178,14 @@ export function registerIpcHandlers(): void {
   // ── AI Advisory ──────────────────────────────────────────────────────
 
   ipcMain.handle('ai:configure', (_event: IpcMainInvokeEvent, config: AIProviderConfig) => {
-    // Inject the API key from secure storage if not provided
-    const resolvedConfig = { ...config };
-    if (!resolvedConfig.apiKey && resolvedConfig.type !== 'none') {
-      resolvedConfig.apiKey = getApiKey(resolvedConfig.type);
-    }
+    // Never accept apiKey or baseUrl from the renderer — always resolve from secure storage.
+    // baseUrl is only allowed for Ollama (local server) and must be localhost.
+    const resolvedConfig: AIProviderConfig = {
+      type: config.type,
+      model: config.model,
+      apiKey: config.type !== 'none' ? getApiKey(config.type) : undefined,
+      baseUrl: config.type === 'ollama' ? validateLocalUrl(config.baseUrl) : undefined,
+    };
     advisor.configure(resolvedConfig);
   });
 

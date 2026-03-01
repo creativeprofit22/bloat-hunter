@@ -7,7 +7,6 @@ if (typeof window !== 'undefined') {
   Object.defineProperty(window, 'electronAPI', {
     value: {
       getAppVersion: () => Promise.resolve('1.0.0'),
-      getPlatform: () => Promise.resolve('test'),
       versions: {
         electron: '33.0.0',
         node: '20.0.0',
@@ -16,7 +15,6 @@ if (typeof window !== 'undefined') {
       startScan: () => Promise.resolve(),
       cancelScan: () => Promise.resolve(),
       generateThumbnail: () => Promise.resolve(null),
-      getFileStat: () => Promise.resolve(null),
       startClean: () =>
         Promise.resolve({
           totalItems: 0,
@@ -37,7 +35,6 @@ if (typeof window !== 'undefined') {
       onScanProgress: noop,
       onScanResult: noop,
       onScanError: noop,
-      onScanComplete: noop,
       onScanCancelled: noop,
       onCleanProgress: noop,
     },

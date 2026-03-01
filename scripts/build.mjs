@@ -7,7 +7,7 @@ async function main() {
   rmSync('dist', { recursive: true, force: true });
 
   console.log('Building renderer...');
-  execSync('npx vite build', { stdio: 'inherit' });
+  execSync('bunx vite build', { stdio: 'inherit' });
 
   console.log('Building main process...');
   await esbuild.build({
@@ -26,7 +26,7 @@ async function main() {
     bundle: true,
     platform: 'node',
     outfile: 'dist/main/scanner-worker.js',
-    external: ['electron'],
+    external: ['electron', 'xxhash-wasm'],
     minify: true,
     sourcemap: true,
   });

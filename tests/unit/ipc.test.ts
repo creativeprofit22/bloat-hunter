@@ -73,11 +73,6 @@ describe('IPC Handlers', () => {
     expect(mocks.handle).toHaveBeenCalledWith('get-app-version', expect.any(Function));
   });
 
-  it('registers get-platform handler', () => {
-    registerIpcHandlers();
-    expect(mocks.handle).toHaveBeenCalledWith('get-platform', expect.any(Function));
-  });
-
   it('registers scanner handlers', () => {
     registerIpcHandlers();
     expect(mocks.handle).toHaveBeenCalledWith('scanner:start', expect.any(Function));
@@ -87,7 +82,6 @@ describe('IPC Handlers', () => {
   it('registers preview handlers', () => {
     registerIpcHandlers();
     expect(mocks.handle).toHaveBeenCalledWith('preview:thumbnail', expect.any(Function));
-    expect(mocks.handle).toHaveBeenCalledWith('preview:file-stat', expect.any(Function));
   });
 
   it('registers clean handlers', () => {
@@ -118,14 +112,6 @@ describe('IPC Handlers', () => {
       (call: unknown[]) => call[0] === 'get-app-version',
     )?.[1] as () => string;
     expect(handler()).toBe('1.0.0');
-  });
-
-  it('get-platform handler returns process.platform', () => {
-    registerIpcHandlers();
-    const handler = mocks.handle.mock.calls.find(
-      (call: unknown[]) => call[0] === 'get-platform',
-    )?.[1] as () => string;
-    expect(handler()).toBe(process.platform);
   });
 
   it('registers will-quit cleanup handler', () => {

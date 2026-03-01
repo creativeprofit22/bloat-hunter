@@ -2,7 +2,6 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
-  getPlatform: () => ipcRenderer.invoke('get-platform'),
   versions: {
     electron: process.versions.electron,
     node: process.versions.node,
@@ -17,7 +16,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ── Preview / Thumbnails ──
   generateThumbnail: (filePath: string, maxSize: number) =>
     ipcRenderer.invoke('preview:thumbnail', filePath, maxSize),
-  getFileStat: (filePath: string) => ipcRenderer.invoke('preview:file-stat', filePath),
 
   // ── Cleaning Actions ──
   startClean: (items: unknown[], action: string, moveTo?: string) =>
@@ -59,11 +57,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);
     ipcRenderer.on('scanner:error', handler);
     return () => ipcRenderer.removeListener('scanner:error', handler);
-  },
-  onScanComplete: (callback: (data: unknown) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);
-    ipcRenderer.on('scanner:complete', handler);
-    return () => ipcRenderer.removeListener('scanner:complete', handler);
   },
   onScanCancelled: (callback: (data: unknown) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);

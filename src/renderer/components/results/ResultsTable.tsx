@@ -30,8 +30,6 @@ function sortResults(
     switch (field) {
       case 'name':
         return dir * getFileName(a.path).localeCompare(getFileName(b.path));
-      case 'path':
-        return dir * a.path.localeCompare(b.path);
       case 'size':
         return dir * (a.size - b.size);
       case 'modified':
