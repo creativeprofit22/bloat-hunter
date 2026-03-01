@@ -1,0 +1,66 @@
+[
+  {
+    "id": "registry.shell.wordwheelquery",
+    "name": "Explorer Search History",
+    "description": "Windows Explorer search bar terms (WordWheelQuery) — tracks every search you've performed",
+    "risk": "yellow",
+    "keyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\WordWheelQuery",
+    "privacyImpact": "Reveals search terms typed in File Explorer and Start Menu search"
+  },
+  {
+    "id": "registry.shell.explorer-addressbar",
+    "name": "Explorer Address Bar History",
+    "description": "Paths entered in the Explorer address bar, including UNC network paths",
+    "risk": "yellow",
+    "keyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\TypedPaths",
+    "privacyImpact": "Reveals manually entered paths and network locations"
+  },
+  {
+    "id": "registry.shell.map-network-drive-mru",
+    "name": "Map Network Drive MRU",
+    "description": "Recently mapped network drive paths stored by Windows Explorer",
+    "risk": "yellow",
+    "keyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Map Network Drive MRU",
+    "privacyImpact": "Reveals network shares and servers accessed via Map Network Drive"
+  },
+  {
+    "id": "registry.shell.taskbar-pinned",
+    "name": "Taskbar Band MRU",
+    "description": "History of taskbar band configuration and recently pinned items",
+    "risk": "red",
+    "keyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Taskband",
+    "privacyImpact": "Contains taskbar layout — modifying may reset pinned items"
+  },
+  {
+    "id": "registry.shell.cmd-commandhistory",
+    "name": "Command Prompt History Size",
+    "description": "Command Prompt (cmd.exe) history configuration and buffer size",
+    "risk": "red",
+    "keyPath": "HKCU\\Console",
+    "privacyImpact": "Console configuration — modifying may reset terminal preferences"
+  },
+  {
+    "id": "registry.shell.powershell-executionpolicy",
+    "name": "PowerShell Console History",
+    "description": "PowerShell console host settings and history configuration",
+    "risk": "red",
+    "keyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU",
+    "privacyImpact": "Run dialog history includes PowerShell commands"
+  },
+  {
+    "id": "registry.shell.appcompat-compatibility",
+    "name": "Application Compatibility Cache",
+    "description": "Windows application compatibility telemetry and shimcache — tracks executables run on the system",
+    "risk": "red",
+    "keyPath": "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\AppCompatCache",
+    "privacyImpact": "System-level cache of all executables run — high forensic value, red risk to modify"
+  },
+  {
+    "id": "registry.shell.muicache",
+    "name": "MUI Cache",
+    "description": "Multilingual User Interface cache — stores display names of previously launched programs",
+    "risk": "yellow",
+    "keyPath": "HKCU\\Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\Shell\\MuiCache",
+    "privacyImpact": "Reveals names of programs that have been executed on this machine"
+  }
+]

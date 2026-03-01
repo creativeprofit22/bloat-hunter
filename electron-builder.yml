@@ -1,0 +1,38 @@
+appId: com.dourodigital.bloat-hunter
+productName: Bloat Hunter
+directories:
+  output: release
+files:
+  - dist/**/*
+  - package.json
+icon: assets/icon.png
+asar: true
+asarUnpack:
+  - dist/main/scanner-worker.js
+win:
+  target:
+    - nsis
+    - portable
+  icon: assets/icon.ico
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.utilities
+  icon: assets/icon.png
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Utility
+  icon: assets/icon.png
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  installerHeaderIcon: assets/icon.ico
+  deleteAppDataOnUninstall: false
+portable:
+  artifactName: ${productName}-${version}-portable.exe
+publish: null

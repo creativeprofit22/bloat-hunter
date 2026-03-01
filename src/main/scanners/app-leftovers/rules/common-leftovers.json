@@ -1,0 +1,90 @@
+[
+  {
+    "id": "app-leftovers.appdata-orphans",
+    "name": "AppData Leftover Folders",
+    "description": "Application data folders in AppData\\Roaming from potentially uninstalled apps",
+    "risk": "yellow",
+    "paths": [
+      {
+        "path": "%APPDATA%",
+        "pattern": "*",
+        "search": "dirs",
+        "recursive": false
+      }
+    ]
+  },
+  {
+    "id": "app-leftovers.localappdata-orphans",
+    "name": "Local AppData Leftover Folders",
+    "description": "Application data folders in AppData\\Local from potentially uninstalled apps",
+    "risk": "yellow",
+    "paths": [
+      {
+        "path": "%LOCALAPPDATA%",
+        "pattern": "*",
+        "search": "dirs",
+        "recursive": false
+      }
+    ]
+  },
+  {
+    "id": "app-leftovers.programdata-orphans",
+    "name": "ProgramData Leftover Folders",
+    "description": "Shared application data from potentially uninstalled programs",
+    "risk": "yellow",
+    "paths": [
+      {
+        "path": "%PROGRAMDATA%",
+        "pattern": "*",
+        "search": "dirs",
+        "recursive": false
+      }
+    ]
+  },
+  {
+    "id": "app-leftovers.startmenu-broken",
+    "name": "Broken Start Menu Shortcuts",
+    "description": "Start Menu shortcuts pointing to executables that no longer exist",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs",
+        "pattern": "*.lnk",
+        "search": "files",
+        "recursive": true
+      },
+      {
+        "path": "%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs",
+        "pattern": "*.lnk",
+        "search": "files",
+        "recursive": true
+      }
+    ]
+  },
+  {
+    "id": "app-leftovers.temp-installers",
+    "name": "Leftover Installer Files",
+    "description": "Temporary installer files left behind after software installation",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "%TEMP%",
+        "pattern": "*.msi",
+        "search": "files",
+        "recursive": false
+      },
+      {
+        "path": "%TEMP%",
+        "pattern": "*.exe",
+        "search": "files",
+        "recursive": false
+      },
+      {
+        "path": "%USERPROFILE%\\Downloads",
+        "pattern": "*.msi",
+        "search": "files",
+        "recursive": false
+      }
+    ]
+  }
+]

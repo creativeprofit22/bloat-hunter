@@ -1,0 +1,58 @@
+[
+  {
+    "id": "system-junk.prefetch",
+    "name": "Windows Prefetch",
+    "description": "Prefetch files used to speed up app launches — safe to delete, they regenerate automatically",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "%WINDIR%\\Prefetch",
+        "pattern": "*.pf",
+        "search": "files",
+        "recursive": false
+      }
+    ]
+  },
+  {
+    "id": "system-junk.thumbnail-cache",
+    "name": "Thumbnail Cache",
+    "description": "Cached file thumbnails — regenerated automatically when browsing folders",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "%LOCALAPPDATA%\\Microsoft\\Windows\\Explorer",
+        "pattern": "thumbcache_*.db",
+        "search": "files",
+        "recursive": false
+      }
+    ]
+  },
+  {
+    "id": "system-junk.font-cache",
+    "name": "Font Cache",
+    "description": "Cached font data — regenerated automatically on restart",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "%WINDIR%\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache",
+        "pattern": "*",
+        "search": "files",
+        "recursive": false
+      }
+    ]
+  },
+  {
+    "id": "system-junk.icon-cache",
+    "name": "Icon Cache",
+    "description": "Cached desktop and file icons — regenerated automatically",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "%LOCALAPPDATA%",
+        "pattern": "IconCache.db",
+        "search": "files",
+        "recursive": false
+      }
+    ]
+  }
+]

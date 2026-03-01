@@ -1,0 +1,157 @@
+[
+  {
+    "id": "browser.firefox.cache",
+    "name": "Firefox Cache",
+    "description": "Cached web content (pages, images, scripts) — regenerated automatically",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "$$PROFILE$$\\cache2",
+        "pattern": "*",
+        "search": "both",
+        "recursive": true,
+        "maxDepth": 5
+      }
+    ]
+  },
+  {
+    "id": "browser.firefox.offline-cache",
+    "name": "Firefox Offline Cache",
+    "description": "Offline application cache — regenerated automatically",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "$$PROFILE$$\\OfflineCache",
+        "pattern": "*",
+        "search": "both",
+        "recursive": true,
+        "maxDepth": 3
+      }
+    ]
+  },
+  {
+    "id": "browser.firefox.startup-cache",
+    "name": "Firefox Startup Cache",
+    "description": "Startup performance cache — regenerated on next launch",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "$$PROFILE$$\\startupCache",
+        "pattern": "*",
+        "search": "both",
+        "recursive": true,
+        "maxDepth": 3
+      }
+    ]
+  },
+  {
+    "id": "browser.firefox.shader-cache",
+    "name": "Firefox Shader Cache",
+    "description": "Cached GPU shaders for WebGL — regenerated automatically",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "$$PROFILE$$\\shader-cache",
+        "pattern": "*",
+        "search": "both",
+        "recursive": true,
+        "maxDepth": 3
+      }
+    ]
+  },
+  {
+    "id": "browser.firefox.cookies",
+    "name": "Firefox Cookies",
+    "description": "Website cookies — deleting will sign you out of all websites",
+    "risk": "yellow",
+    "paths": [
+      { "path": "$$PROFILE$$", "pattern": "cookies.sqlite", "search": "files", "recursive": false },
+      {
+        "path": "$$PROFILE$$",
+        "pattern": "cookies.sqlite-wal",
+        "search": "files",
+        "recursive": false
+      },
+      {
+        "path": "$$PROFILE$$",
+        "pattern": "cookies.sqlite-shm",
+        "search": "files",
+        "recursive": false
+      }
+    ]
+  },
+  {
+    "id": "browser.firefox.history",
+    "name": "Firefox History",
+    "description": "Browsing history, bookmarks database, and visited URLs — cannot be recovered once deleted",
+    "risk": "yellow",
+    "paths": [
+      { "path": "$$PROFILE$$", "pattern": "places.sqlite", "search": "files", "recursive": false },
+      {
+        "path": "$$PROFILE$$",
+        "pattern": "places.sqlite-wal",
+        "search": "files",
+        "recursive": false
+      },
+      {
+        "path": "$$PROFILE$$",
+        "pattern": "places.sqlite-shm",
+        "search": "files",
+        "recursive": false
+      }
+    ]
+  },
+  {
+    "id": "browser.firefox.session",
+    "name": "Firefox Session Data",
+    "description": "Session restore data — open tabs and windows will not be restorable",
+    "risk": "yellow",
+    "paths": [
+      {
+        "path": "$$PROFILE$$",
+        "pattern": "sessionstore.jsonlz4",
+        "search": "files",
+        "recursive": false
+      },
+      {
+        "path": "$$PROFILE$$\\sessionstore-backups",
+        "pattern": "*",
+        "search": "files",
+        "recursive": false
+      }
+    ]
+  },
+  {
+    "id": "browser.firefox.dom-storage",
+    "name": "Firefox DOM Storage",
+    "description": "Website local storage — may contain login tokens and saved preferences",
+    "risk": "yellow",
+    "paths": [
+      {
+        "path": "$$PROFILE$$",
+        "pattern": "webappsstore.sqlite",
+        "search": "files",
+        "recursive": false
+      },
+      {
+        "path": "$$PROFILE$$",
+        "pattern": "webappsstore.sqlite-wal",
+        "search": "files",
+        "recursive": false
+      },
+      {
+        "path": "$$PROFILE$$",
+        "pattern": "webappsstore.sqlite-shm",
+        "search": "files",
+        "recursive": false
+      },
+      {
+        "path": "$$PROFILE$$\\storage\\default",
+        "pattern": "*",
+        "search": "both",
+        "recursive": true,
+        "maxDepth": 5
+      }
+    ]
+  }
+]

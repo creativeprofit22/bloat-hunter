@@ -1,0 +1,82 @@
+[
+  {
+    "id": "registry.mru.explorer-runmru",
+    "name": "Explorer Run MRU",
+    "description": "Run dialog (Win+R) recently used commands — tracks every command you've typed",
+    "risk": "yellow",
+    "keyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU",
+    "privacyImpact": "Reveals commands and programs launched via the Run dialog"
+  },
+  {
+    "id": "registry.mru.explorer-typedpaths",
+    "name": "Explorer Typed Paths",
+    "description": "File Explorer address bar history — paths you've manually typed or pasted",
+    "risk": "yellow",
+    "keyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\TypedPaths",
+    "privacyImpact": "Reveals folders and network paths accessed via Explorer address bar"
+  },
+  {
+    "id": "registry.mru.explorer-recentdocs",
+    "name": "Explorer Recent Documents",
+    "description": "Recent documents MRU list tracked by Windows Explorer",
+    "risk": "yellow",
+    "keyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RecentDocs",
+    "privacyImpact": "Reveals recently opened documents and file types"
+  },
+  {
+    "id": "registry.mru.common-dialog-opensave",
+    "name": "Common Open/Save Dialog MRU",
+    "description": "File open and save dialog recently used locations and filenames",
+    "risk": "yellow",
+    "keyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSavePidlMRU",
+    "privacyImpact": "Reveals files opened or saved via standard Windows file dialogs"
+  },
+  {
+    "id": "registry.mru.common-dialog-lastvisited",
+    "name": "Common Dialog Last Visited",
+    "description": "Last visited folders in open/save file dialogs",
+    "risk": "yellow",
+    "keyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedPidlMRU",
+    "privacyImpact": "Reveals folders recently accessed via file open/save dialogs"
+  },
+  {
+    "id": "registry.mru.userassist",
+    "name": "UserAssist Program Tracking",
+    "description": "ROT13-encoded program launch counts and timestamps tracked by Explorer",
+    "risk": "red",
+    "keyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\UserAssist",
+    "privacyImpact": "Tracks every program launched via Explorer — names, counts, and last run times"
+  },
+  {
+    "id": "registry.mru.office-mru",
+    "name": "Microsoft Office MRU",
+    "description": "Recently opened files in Microsoft Office applications (Word, Excel, PowerPoint)",
+    "risk": "yellow",
+    "keyPath": "HKCU\\Software\\Microsoft\\Office",
+    "privacyImpact": "Reveals recently opened Office documents with full file paths"
+  },
+  {
+    "id": "registry.mru.mediaplayer-recentfiles",
+    "name": "Windows Media Player Recent Files",
+    "description": "Recently played media files in Windows Media Player",
+    "risk": "yellow",
+    "keyPath": "HKCU\\Software\\Microsoft\\MediaPlayer\\Player\\RecentFileList",
+    "privacyImpact": "Reveals recently played audio and video files"
+  },
+  {
+    "id": "registry.mru.paint-recentfiles",
+    "name": "Paint Recent Files",
+    "description": "Recently opened files in Microsoft Paint",
+    "risk": "yellow",
+    "keyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Applets\\Paint\\Recent File List",
+    "privacyImpact": "Reveals recently opened image files in Paint"
+  },
+  {
+    "id": "registry.mru.wordpad-recentfiles",
+    "name": "WordPad Recent Files",
+    "description": "Recently opened files in WordPad",
+    "risk": "yellow",
+    "keyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Applets\\Wordpad\\Recent File List",
+    "privacyImpact": "Reveals recently opened documents in WordPad"
+  }
+]

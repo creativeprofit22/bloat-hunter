@@ -1,0 +1,64 @@
+[
+  {
+    "id": "system-junk.memory-dump",
+    "name": "Memory Dump Files",
+    "description": "System crash dump files — can be very large",
+    "risk": "yellow",
+    "paths": [
+      {
+        "path": "%WINDIR%",
+        "pattern": "MEMORY.DMP",
+        "search": "files",
+        "recursive": false
+      },
+      {
+        "path": "%WINDIR%\\Minidump",
+        "pattern": "*.dmp",
+        "search": "files",
+        "recursive": false
+      }
+    ]
+  },
+  {
+    "id": "system-junk.delivery-optimization",
+    "name": "Delivery Optimization Cache",
+    "description": "Windows Update delivery optimization cache for peer-to-peer updates",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "%WINDIR%\\SoftwareDistribution\\DeliveryOptimization",
+        "pattern": "*",
+        "search": "files",
+        "recursive": true
+      }
+    ]
+  },
+  {
+    "id": "system-junk.retail-demo",
+    "name": "Retail Demo Content",
+    "description": "Content from Windows retail demo mode — unnecessary on personal PCs",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "%PROGRAMDATA%\\Microsoft\\Windows\\RetailDemo",
+        "pattern": "*",
+        "search": "files",
+        "recursive": true
+      }
+    ]
+  },
+  {
+    "id": "system-junk.installer-cache",
+    "name": "Windows Installer Patch Cache",
+    "description": "Orphaned Windows Installer patch files — some may be needed for uninstalls",
+    "risk": "red",
+    "paths": [
+      {
+        "path": "%WINDIR%\\Installer\\$PatchCache$",
+        "pattern": "*",
+        "search": "files",
+        "recursive": true
+      }
+    ]
+  }
+]

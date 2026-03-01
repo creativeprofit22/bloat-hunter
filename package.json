@@ -1,0 +1,66 @@
+{
+  "name": "bloat-hunter",
+  "version": "0.1.0",
+  "description": "Find and eliminate disk bloat. Cache files, stale junk, duplicates, and everything slowing your PC down.",
+  "main": "dist/main/index.js",
+  "author": "Douro Digital <hello@wearedouro.agency>",
+  "homepage": "https://wearedouro.agency",
+  "license": "MIT",
+  "scripts": {
+    "dev": "bun scripts/dev.mjs",
+    "build": "bun scripts/build.mjs",
+    "package": "bun run build && electron-builder --config electron-builder.yml",
+    "package:win": "bun run build && electron-builder --config electron-builder.yml --win",
+    "package:mac": "bun run build && electron-builder --config electron-builder.yml --mac",
+    "package:linux": "bun run build && electron-builder --config electron-builder.yml --linux",
+    "lint": "eslint src/ tests/",
+    "lint:fix": "eslint src/ tests/ --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,html}\" \"tests/**/*.{ts,tsx}\" \"*.config.ts\" \"eslint.config.mjs\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,html}\" \"tests/**/*.{ts,tsx}\" \"*.config.ts\" \"eslint.config.mjs\"",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "bun run typecheck && bun run lint && bun run format:check && bun run test",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{css,html,json,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^25.2.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "electron": "^40.4.1",
+    "electron-builder": "^26.7.0",
+    "esbuild": "^0.27.3",
+    "eslint": "^9.39.2",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.0",
+    "globals": "^17.3.0",
+    "husky": "^9.1.7",
+    "jsdom": "^28.1.0",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.55.0",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "sharp": "^0.34.5",
+    "xxhash-wasm": "^1.1.0",
+    "zustand": "^5.0.11"
+  }
+}

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "system-junk.windows-update-cache",
+    "name": "Windows Update Cache",
+    "description": "Downloaded Windows Update files — may require stopping the Windows Update service to clean",
+    "risk": "yellow",
+    "paths": [
+      {
+        "path": "%WINDIR%\\SoftwareDistribution\\Download",
+        "pattern": "*",
+        "search": "files",
+        "recursive": true
+      }
+    ]
+  },
+  {
+    "id": "system-junk.windows-old",
+    "name": "Previous Windows Installation",
+    "description": "Windows.old directory from a previous Windows installation or major update — can be very large",
+    "risk": "yellow",
+    "paths": [
+      {
+        "path": "%SYSTEMDRIVE%",
+        "pattern": "Windows.old",
+        "search": "dirs",
+        "recursive": false
+      }
+    ]
+  },
+  {
+    "id": "system-junk.uninstall-remnants",
+    "name": "Update Uninstall Data",
+    "description": "Uninstall data from old Windows updates ($NtUninstall directories)",
+    "risk": "yellow",
+    "paths": [
+      {
+        "path": "%WINDIR%",
+        "pattern": "$NtUninstall*",
+        "search": "dirs",
+        "recursive": false
+      }
+    ]
+  }
+]

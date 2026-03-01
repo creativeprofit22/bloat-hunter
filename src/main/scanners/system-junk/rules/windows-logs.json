@@ -1,0 +1,88 @@
+[
+  {
+    "id": "system-junk.wer-reports",
+    "name": "Windows Error Reports",
+    "description": "Crash and error reports sent to Microsoft — safe to delete",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "%LOCALAPPDATA%\\CrashDumps",
+        "pattern": "*",
+        "search": "files",
+        "recursive": false
+      },
+      {
+        "path": "%PROGRAMDATA%\\Microsoft\\Windows\\WER\\ReportArchive",
+        "pattern": "*",
+        "search": "files",
+        "recursive": true
+      },
+      {
+        "path": "%PROGRAMDATA%\\Microsoft\\Windows\\WER\\ReportQueue",
+        "pattern": "*",
+        "search": "files",
+        "recursive": true
+      }
+    ]
+  },
+  {
+    "id": "system-junk.setup-logs",
+    "name": "Setup Logs",
+    "description": "Windows setup and installation log files",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "%WINDIR%\\Panther",
+        "pattern": "*.log",
+        "search": "files",
+        "recursive": true
+      },
+      {
+        "path": "%WINDIR%\\inf",
+        "pattern": "setupapi*.log",
+        "search": "files",
+        "recursive": false
+      }
+    ]
+  },
+  {
+    "id": "system-junk.system-logs",
+    "name": "System Log Files",
+    "description": "Windows system log files — old logs can be safely removed",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "%WINDIR%\\Logs",
+        "pattern": "*.log",
+        "search": "files",
+        "recursive": true
+      },
+      {
+        "path": "%WINDIR%\\System32\\LogFiles",
+        "pattern": "*",
+        "search": "files",
+        "recursive": true
+      }
+    ]
+  },
+  {
+    "id": "system-junk.event-trace-logs",
+    "name": "Event Trace Logs",
+    "description": "ETL diagnostic trace files — safe to remove old traces",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "%WINDIR%\\Logs\\CBS",
+        "pattern": "*.log",
+        "search": "files",
+        "recursive": false
+      },
+      {
+        "path": "%WINDIR%\\System32\\winevt\\Logs",
+        "pattern": "*.etl",
+        "search": "files",
+        "recursive": false
+      }
+    ]
+  }
+]

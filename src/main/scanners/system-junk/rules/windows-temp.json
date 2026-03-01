@@ -1,0 +1,30 @@
+[
+  {
+    "id": "system-junk.user-temp",
+    "name": "User Temp Files",
+    "description": "Temporary files in the current user's temp directory",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "%TEMP%",
+        "pattern": "*",
+        "search": "files",
+        "recursive": true
+      }
+    ]
+  },
+  {
+    "id": "system-junk.system-temp",
+    "name": "System Temp Files",
+    "description": "Temporary files in the Windows system temp directory",
+    "risk": "green",
+    "paths": [
+      {
+        "path": "%WINDIR%\\Temp",
+        "pattern": "*",
+        "search": "files",
+        "recursive": true
+      }
+    ]
+  }
+]
