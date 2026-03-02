@@ -56,7 +56,7 @@ export function loadSettings(): AppSettings {
   return cached;
 }
 
-export function saveSettings(settings: AppSettings): void {
+function saveSettings(settings: AppSettings): void {
   const dir = path.dirname(getSettingsPath());
   mkdirSync(dir, { recursive: true });
   writeFileSync(getSettingsPath(), JSON.stringify(settings, null, 2), 'utf-8');
@@ -65,9 +65,50 @@ export function saveSettings(settings: AppSettings): void {
   cached = settings;
 }
 
+function validateSettings(partial: Partial<AppSettings>): Partial<AppSettings> {
+  const validated = { ...partial };
+  if (
+    'maxDepth' in validated &&
+    (typeof validated.maxDepth !== 'number' || !Number.isFinite(validated.maxDepth))
+  ) {
+    delete validated.maxDepth;
+  }
+  if (
+    'minSize' in validated &&
+    (typeof validated.minSize !== 'number' || !Number.isFinite(validated.minSize))
+  ) {
+    delete validated.minSize;
+  }
+  if (
+    'staleMonths' in validated &&
+    (typeof validated.staleMonths !== 'number' || !Number.isFinite(validated.staleMonths))
+  ) {
+    delete validated.staleMonths;
+  }
+  if (
+    'topN' in validated &&
+    (typeof validated.topN !== 'number' || !Number.isFinite(validated.topN))
+  ) {
+    delete validated.topN;
+  }
+  const validProviders = ['none', 'claude', 'openai', 'ollama'];
+  if ('aiProvider' in validated && !validProviders.includes(validated.aiProvider as string)) {
+    delete validated.aiProvider;
+  }
+  const validActions = ['recycle', 'delete', 'move'];
+  if (
+    'defaultCleanAction' in validated &&
+    !validActions.includes(validated.defaultCleanAction as string)
+  ) {
+    delete validated.defaultCleanAction;
+  }
+  return validated;
+}
+
 export function updateSettings(partial: Partial<AppSettings>): AppSettings {
   const current = loadSettings();
-  const updated = { ...current, ...partial };
+  const validated = validateSettings(partial);
+  const updated = { ...current, ...validated };
   saveSettings(updated);
   return updated;
 }

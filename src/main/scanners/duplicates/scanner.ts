@@ -25,7 +25,7 @@ export class DuplicatesScanner extends BaseScanner {
   }
 
   async scan(): Promise<ScanResult[]> {
-    const minSize = this.config.minSize ?? 1;
+    const minSize = this.config.minSize ?? 0;
     const includeExts = this.config.includeExtensions?.map((e) => e.toLowerCase());
     const excludeExts = this.config.excludeExtensions?.map((e) => e.toLowerCase());
 

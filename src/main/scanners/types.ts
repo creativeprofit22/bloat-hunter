@@ -179,17 +179,6 @@ export interface BrowserProfile {
 
 // ── Registry Scanner ─────────────────────────────────────────────────
 
-export interface RegistryFinding {
-  /** Registry key path */
-  keyPath: string;
-  /** Number of values in this key */
-  valueCount: number;
-  /** Category (MRU, shell history, etc.) */
-  category: string;
-  /** Privacy impact description */
-  privacyImpact: string;
-}
-
 // ── AI Advisory Layer ────────────────────────────────────────────────
 
 export type AIProviderType = 'claude' | 'openai' | 'ollama' | 'none';

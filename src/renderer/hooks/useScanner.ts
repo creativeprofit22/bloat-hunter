@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useScanStore } from '../store/scan-store';
 import { useSettingsStore } from '../store/settings-store';
 import type {
@@ -35,31 +35,46 @@ export function useScanner() {
     setCancelled,
   } = useScanStore();
 
-  // Subscribe to IPC events on mount, clean up on unmount
+  // Keep refs pointing to the latest store functions so the IPC effect
+  // doesn't need to re-register listeners when store references change.
+  const updateProgressRef = useRef(updateProgress);
+  const setResultsRef = useRef(setResults);
+  const setErrorRef = useRef(setError);
+  const setCancelledRef = useRef(setCancelled);
+
+  useEffect(() => {
+    updateProgressRef.current = updateProgress;
+    setResultsRef.current = setResults;
+    setErrorRef.current = setError;
+    setCancelledRef.current = setCancelled;
+  });
+
+  // Subscribe to IPC events once on mount, clean up on unmount.
+  // Using refs avoids re-subscribing during StrictMode's unmount-remount cycle.
   useEffect(() => {
     const api = window.electronAPI;
 
     const unsubProgress = api.onScanProgress((data) => {
-      if (typeof data !== 'object' || data === null) return;
-      updateProgress(data as ScanProgress);
+      if (typeof data !== 'object' || data === null || !('scannerType' in data)) return;
+      updateProgressRef.current(data as ScanProgress);
     });
 
     const unsubResult = api.onScanResult((data) => {
       if (typeof data !== 'object' || data === null || !('scannerType' in data)) return;
       const payload = data as ScanResultPayload;
-      setResults(payload.scannerType, payload.results);
+      setResultsRef.current(payload.scannerType, payload.results);
     });
 
     const unsubError = api.onScanError((data) => {
       if (typeof data !== 'object' || data === null || !('scannerType' in data)) return;
       const payload = data as ScanErrorPayload;
-      setError(payload.scannerType, payload.error);
+      setErrorRef.current(payload.scannerType, payload.error);
     });
 
     const unsubCancelled = api.onScanCancelled((data) => {
       if (typeof data !== 'object' || data === null || !('scannerType' in data)) return;
       const payload = data as ScanCancelledPayload;
-      setCancelled(payload.scannerType);
+      setCancelledRef.current(payload.scannerType);
     });
 
     return () => {
@@ -68,7 +83,7 @@ export function useScanner() {
       unsubError();
       unsubCancelled();
     };
-  }, [updateProgress, setResults, setError, setCancelled]);
+  }, []);
 
   const scanPaths = useSettingsStore((s) => s.scanPaths);
   const exclusions = useSettingsStore((s) => s.exclusions);

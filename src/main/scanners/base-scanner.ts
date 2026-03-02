@@ -1,5 +1,5 @@
 import { readdir, stat } from 'fs/promises';
-import { join } from 'path';
+import { basename, join } from 'path';
 import type { ScannerType, ScannerConfig, ScanResult, ScanProgress } from './types';
 
 /** Entry returned by the walkFiles async generator. */
@@ -67,9 +67,28 @@ export abstract class BaseScanner {
   }
 
   /**
+   * Check whether a file or directory path matches any exclusion pattern
+   * from this.config.exclusions. Supports simple glob patterns with `*`.
+   */
+  private isExcluded(filePath: string): boolean {
+    if (!this.config.exclusions?.length) return false;
+    const name = basename(filePath);
+    return this.config.exclusions.some((pattern) => {
+      if (pattern.includes('*')) {
+        const regex = new RegExp(
+          '^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$',
+          'i',
+        );
+        return regex.test(name);
+      }
+      return name.toLowerCase() === pattern.toLowerCase();
+    });
+  }
+
+  /**
    * Async generator that recursively walks a directory tree.
    * Yields file/directory entries with metadata.
-   * Respects maxDepth, cancellation, and handles permission errors.
+   * Respects maxDepth, exclusions, cancellation, and handles permission errors.
    */
   protected async *walkFiles(dir: string, maxDepth?: number, depth = 0): AsyncGenerator<FileEntry> {
     const effectiveMaxDepth = maxDepth ?? this.config.maxDepth;
@@ -88,6 +107,9 @@ export abstract class BaseScanner {
       if (this.cancelled) return;
 
       const fullPath = join(dir, entry.name);
+
+      // Skip files and directories matching exclusion patterns
+      if (this.isExcluded(fullPath)) continue;
 
       try {
         if (entry.isFile()) {

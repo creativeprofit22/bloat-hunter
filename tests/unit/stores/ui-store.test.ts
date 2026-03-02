@@ -34,13 +34,13 @@ describe('UIStore', () => {
     expect(useUIStore.getState().previewVisible).toBe(true);
   });
 
-  it('selectItem adds item to selection', () => {
-    useUIStore.getState().selectItem('item-1');
+  it('toggleItem adds item to selection', () => {
+    useUIStore.getState().toggleItem('item-1');
     expect('item-1' in useUIStore.getState().selectedIds).toBe(true);
   });
 
   it('deselectItem removes item from selection', () => {
-    useUIStore.getState().selectItem('item-1');
+    useUIStore.getState().toggleItem('item-1');
     useUIStore.getState().deselectItem('item-1');
     expect('item-1' in useUIStore.getState().selectedIds).toBe(false);
   });
@@ -62,7 +62,7 @@ describe('UIStore', () => {
   });
 
   it('selectItems preserves existing selections', () => {
-    useUIStore.getState().selectItem('existing');
+    useUIStore.getState().toggleItem('existing');
     useUIStore.getState().selectItems(['new']);
     const ids = useUIStore.getState().selectedIds;
     expect('existing' in ids).toBe(true);
@@ -76,7 +76,7 @@ describe('UIStore', () => {
   });
 
   it('selectAll replaces current selection', () => {
-    useUIStore.getState().selectItem('old');
+    useUIStore.getState().toggleItem('old');
     useUIStore.getState().selectAll(['new-1', 'new-2']);
     const ids = useUIStore.getState().selectedIds;
     expect(Object.keys(ids).length).toBe(2);

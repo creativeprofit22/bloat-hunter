@@ -28,10 +28,13 @@ function validateLocalUrl(url?: string): string | undefined {
     if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
       return url;
     }
-  } catch {
-    // invalid URL
+    throw new Error(
+      `Only localhost URLs are allowed for Ollama (got ${host}). Use localhost, 127.0.0.1, or ::1.`,
+    );
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith('Only localhost')) throw e;
+    return undefined;
   }
-  return undefined;
 }
 
 const workerManager = new WorkerManager();
@@ -77,7 +80,7 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle('scanner:cancel', (_event: IpcMainInvokeEvent, scannerType: ScannerType) => {
-    workerManager.cancelScan(scannerType);
+    return workerManager.cancelScan(scannerType);
   });
 
   // ── Preview / Thumbnails ───────────────────────────────────────────

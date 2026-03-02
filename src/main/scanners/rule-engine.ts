@@ -3,7 +3,7 @@ import { join } from 'path';
 import type { ScanRule, RulePath } from './types';
 
 /** A single match produced by the rule engine. */
-export interface RuleMatch {
+interface RuleMatch {
   path: string;
   size: number;
   modified: number;
@@ -100,7 +100,7 @@ export async function* executeRule(
  * Execute a single rule path: resolve env vars, walk the directory,
  * and yield matching files/dirs.
  */
-export async function* executeRulePath(
+async function* executeRulePath(
   rulePath: RulePath,
   cancelled: () => boolean,
 ): AsyncGenerator<RuleMatch> {

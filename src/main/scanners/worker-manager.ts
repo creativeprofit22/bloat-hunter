@@ -19,7 +19,9 @@ const CANCEL_TIMEOUT_MS = 5000;
  */
 export class WorkerManager {
   private workers = new Map<ScannerType, Worker>();
+  private workerCallbacks = new Map<ScannerType, WorkerCallbacks>();
   private cancelTimeouts = new Map<ScannerType, ReturnType<typeof setTimeout>>();
+  private forceCancelled = new Set<string>();
 
   /**
    * Resolve the path to the compiled scanner-worker.js.
@@ -60,6 +62,7 @@ export class WorkerManager {
       this.clearCancelTimeout(scannerType);
       existing.terminate();
       this.workers.delete(scannerType);
+      this.workerCallbacks.delete(scannerType);
     }
 
     const worker = new Worker(this.getWorkerPath(), {
@@ -67,6 +70,7 @@ export class WorkerManager {
     });
 
     this.workers.set(scannerType, worker);
+    this.workerCallbacks.set(scannerType, callbacks);
 
     worker.on('message', (msg: WorkerMessage) => {
       switch (msg.type) {
@@ -76,15 +80,18 @@ export class WorkerManager {
         case 'result':
           callbacks.onResult(scannerType, msg.data);
           this.workers.delete(scannerType);
+          this.workerCallbacks.delete(scannerType);
           break;
         case 'error':
           callbacks.onError(scannerType, msg.data);
           this.workers.delete(scannerType);
+          this.workerCallbacks.delete(scannerType);
           break;
         case 'cancelled':
           this.clearCancelTimeout(scannerType);
           callbacks.onCancelled(scannerType);
           this.workers.delete(scannerType);
+          this.workerCallbacks.delete(scannerType);
           break;
       }
     });
@@ -94,14 +101,21 @@ export class WorkerManager {
       if (this.workers.get(scannerType) === worker) {
         callbacks.onError(scannerType, err.message);
         this.workers.delete(scannerType);
+        this.workerCallbacks.delete(scannerType);
       }
     });
 
     worker.on('exit', (code) => {
+      // If this worker was force-cancelled, skip the error — cancellation was already reported
+      if (this.forceCancelled.has(scannerType)) {
+        this.forceCancelled.delete(scannerType);
+        return;
+      }
       // Only report if this specific worker exited abnormally and is still tracked
       if (code !== 0 && this.workers.get(scannerType) === worker) {
         callbacks.onError(scannerType, `Worker exited with code ${code}`);
         this.workers.delete(scannerType);
+        this.workerCallbacks.delete(scannerType);
       }
     });
   }
@@ -110,24 +124,30 @@ export class WorkerManager {
    * Send a cancel request to the worker running the given scanner type.
    * If the worker doesn't respond within the grace period, it is force-terminated.
    */
-  cancelScan(scannerType: ScannerType): void {
+  cancelScan(scannerType: ScannerType): boolean {
     const worker = this.workers.get(scannerType);
-    if (worker) {
-      worker.postMessage({ type: 'cancel' });
+    if (!worker) return false;
 
-      // Force-terminate if cooperative cancel doesn't respond in time
-      this.clearCancelTimeout(scannerType);
-      this.cancelTimeouts.set(
-        scannerType,
-        setTimeout(() => {
-          if (this.workers.get(scannerType) === worker) {
-            worker.terminate();
-            // The 'exit' handler will clean up this.workers
-          }
-          this.cancelTimeouts.delete(scannerType);
-        }, CANCEL_TIMEOUT_MS),
-      );
-    }
+    worker.postMessage({ type: 'cancel' });
+
+    // Force-terminate if cooperative cancel doesn't respond in time
+    this.clearCancelTimeout(scannerType);
+    this.cancelTimeouts.set(
+      scannerType,
+      setTimeout(() => {
+        if (this.workers.get(scannerType) === worker) {
+          this.forceCancelled.add(scannerType);
+          const cbs = this.workerCallbacks.get(scannerType);
+          if (cbs) cbs.onCancelled(scannerType);
+          this.workers.delete(scannerType);
+          this.workerCallbacks.delete(scannerType);
+          worker.terminate();
+        }
+        this.cancelTimeouts.delete(scannerType);
+      }, CANCEL_TIMEOUT_MS),
+    );
+
+    return true;
   }
 
   /** Forcefully terminate all workers. Call on app shutdown. */
@@ -141,5 +161,6 @@ export class WorkerManager {
     const terminations = [...this.workers.values()].map((w) => w.terminate());
     await Promise.all(terminations);
     this.workers.clear();
+    this.workerCallbacks.clear();
   }
 }

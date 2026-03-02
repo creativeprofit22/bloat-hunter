@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { usePreview } from '../../hooks/usePreview';
 import { useUIStore } from '../../store/ui-store';
 import { FileInfo } from './FileInfo';
@@ -7,15 +8,29 @@ import { CompareView } from './CompareView';
 export function PreviewPanel() {
   const previewVisible = useUIStore((s) => s.previewVisible);
   const togglePreview = useUIStore((s) => s.togglePreview);
+  const selectedIds = useUIStore((s) => s.selectedIds);
 
   const {
     focusedResult,
+    setFocusedId,
     getMetadata,
     compareResults,
     thumbnail,
     thumbnailLoading,
     isImageFile: isImage,
   } = usePreview();
+
+  // When exactly one item is selected, treat it as the focused item for single-file preview
+  useEffect(() => {
+    const ids = Object.keys(selectedIds);
+    if (ids.length === 1) {
+      setFocusedId(ids[0]);
+    } else if (ids.length === 0) {
+      setFocusedId(null);
+    }
+    // When multiple items are selected, keep the current focusedId
+    // (compareResults() handles the 2-selected case separately)
+  }, [selectedIds, setFocusedId]);
 
   if (!previewVisible) return null;
 

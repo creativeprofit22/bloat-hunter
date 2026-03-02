@@ -28,9 +28,6 @@ interface UIStore {
   /** Toggle preview panel visibility */
   togglePreview: () => void;
 
-  /** Select a result item */
-  selectItem: (id: string) => void;
-
   /** Deselect a result item */
   deselectItem: (id: string) => void;
 
@@ -58,11 +55,6 @@ export const useUIStore = create<UIStore>((set) => ({
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 
   togglePreview: () => set((state) => ({ previewVisible: !state.previewVisible })),
-
-  selectItem: (id) =>
-    set((state) => ({
-      selectedIds: { ...state.selectedIds, [id]: true },
-    })),
 
   deselectItem: (id) =>
     set((state) => {

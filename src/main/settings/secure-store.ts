@@ -68,5 +68,13 @@ export function getApiKey(provider: string): string {
 
 export function hasApiKey(provider: string): boolean {
   const keys = readKeys();
-  return provider in keys;
+  if (!(provider in keys)) return false;
+  if (!safeStorage.isEncryptionAvailable()) return false;
+  try {
+    const buffer = Buffer.from(keys[provider], 'base64');
+    const decrypted = safeStorage.decryptString(buffer);
+    return decrypted.length > 0;
+  } catch {
+    return false;
+  }
 }

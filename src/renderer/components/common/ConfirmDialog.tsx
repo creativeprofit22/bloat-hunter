@@ -12,6 +12,10 @@ interface ConfirmDialogProps {
   riskBreakdown: Record<RiskLevel, number>;
   /** Current default action */
   defaultAction: CleanAction;
+  /** Whether the current process has admin privileges */
+  isAdmin: boolean;
+  /** Pre-configured quarantine path from settings */
+  quarantinePath: string;
   /** Called when user confirms — passes chosen action and optional move path */
   onConfirm: (action: CleanAction, moveTo?: string) => void;
   /** Called when user cancels */
@@ -32,11 +36,14 @@ export function ConfirmDialog({
   totalBytes,
   riskBreakdown,
   defaultAction,
+  isAdmin,
+  quarantinePath,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
   const [action, setAction] = useState<CleanAction>(defaultAction);
-  const [moveTo, setMoveTo] = useState('');
+  const [moveTo, setMoveTo] = useState(quarantinePath || '');
+  const [acknowledgeRisk, setAcknowledgeRisk] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const handleOverlayClick = useCallback(
@@ -113,6 +120,25 @@ export function ConfirmDialog({
             </div>
           )}
 
+          {!isAdmin && (
+            <div className="confirm-dialog-warning confirm-dialog-warning--admin">
+              Not running as administrator. Some system-level items may fail to clean due to
+              insufficient permissions.
+            </div>
+          )}
+
+          {hasRedRisk && (
+            <label className="confirm-dialog-acknowledge">
+              <input
+                type="checkbox"
+                checked={acknowledgeRisk}
+                onChange={(e) => setAcknowledgeRisk(e.target.checked)}
+              />
+              I understand that cleaning {riskBreakdown.red} high-risk item
+              {riskBreakdown.red > 1 ? 's' : ''} may affect system stability
+            </label>
+          )}
+
           <div className="confirm-dialog-action-select">
             <label className="confirm-dialog-label">Clean method:</label>
             <div className="confirm-dialog-actions">
@@ -170,7 +196,7 @@ export function ConfirmDialog({
           <button
             className={`confirm-dialog-btn confirm-dialog-btn--confirm ${action === 'delete' ? 'confirm-dialog-btn--danger' : ''}`}
             onClick={() => onConfirm(action, action === 'move' ? moveTo : undefined)}
-            disabled={action === 'move' && !moveTo.trim()}
+            disabled={(action === 'move' && !moveTo.trim()) || (hasRedRisk && !acknowledgeRisk)}
           >
             {action === 'recycle'
               ? 'Send to Recycle Bin'

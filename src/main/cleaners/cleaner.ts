@@ -10,13 +10,13 @@ import type {
   CleanProgressInfo,
 } from '../scanners/types';
 
-export interface CleanOptions {
+interface CleanOptions {
   action: CleanAction;
   /** Required when action is 'move' — destination folder */
   moveTo?: string;
 }
 
-export type CleanProgressCallback = (progress: CleanProgressInfo) => void;
+type CleanProgressCallback = (progress: CleanProgressInfo) => void;
 
 /** Generate a unique destination path, appending (1), (2), etc. if name already exists. */
 async function uniqueDestPath(dir: string, fileName: string): Promise<string> {
@@ -91,14 +91,24 @@ async function processItems(
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
 
-    onProgress?.({
-      current: i + 1,
-      total: items.length,
-      currentPath: item.path,
-      bytesRecovered: result.bytesRecovered,
-      successCount: result.successCount,
-      failedCount: result.failedCount,
-    });
+    // Gap 14: Skip registry key paths — they cannot be handled by filesystem operations
+    if (item.path.startsWith('HKEY_')) {
+      result.failedCount++;
+      result.errors.push({
+        path: item.path,
+        message: 'Registry key cleanup is not yet supported',
+      });
+
+      onProgress?.({
+        current: i + 1,
+        total: items.length,
+        currentPath: item.path,
+        bytesRecovered: result.bytesRecovered,
+        successCount: result.successCount,
+        failedCount: result.failedCount,
+      });
+      continue;
+    }
 
     try {
       // Verify the item still exists before attempting to clean
@@ -138,6 +148,16 @@ async function processItems(
       };
       result.errors.push(error);
     }
+
+    // Gap 13: Progress fires AFTER item is processed so counts reflect completed work
+    onProgress?.({
+      current: i + 1,
+      total: items.length,
+      currentPath: item.path,
+      bytesRecovered: result.bytesRecovered,
+      successCount: result.successCount,
+      failedCount: result.failedCount,
+    });
   }
 
   // Final progress report

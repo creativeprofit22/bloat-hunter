@@ -20,6 +20,7 @@ export interface CleanerState {
   riskBreakdown: Record<RiskLevel, number>;
   progress: CleanProgressInfo | null;
   result: CleanResult | null;
+  isAdmin: boolean;
 }
 
 function scanResultToCleanable(result: ScanResult): CleanableItem {
@@ -47,12 +48,14 @@ export function useCleaner() {
     riskBreakdown: { green: 0, yellow: 0, red: 0 },
     progress: null,
     result: null,
+    isAdmin: false,
   });
 
   const selectedIds = useUIStore((s) => s.selectedIds);
   const clearSelection = useUIStore((s) => s.clearSelection);
   const scanners = useScanStore((s) => s.scanners);
   const defaultAction = useSettingsStore((s) => s.defaultCleanAction);
+  const quarantinePath = useSettingsStore((s) => s.quarantinePath);
 
   // Listen for clean progress events
   useEffect(() => {
@@ -88,14 +91,37 @@ export function useCleaner() {
       riskBreakdown[item.risk]++;
     }
 
-    setState({
-      phase: 'confirming',
-      items,
-      totalBytes,
-      riskBreakdown,
-      progress: null,
-      result: null,
-    });
+    // Check admin status — system-level paths may need elevation
+    const hasSystemPaths = items.some(
+      (item) =>
+        item.path.toLowerCase().includes('\\windows\\') ||
+        item.path.toLowerCase().includes('\\programdata\\') ||
+        item.path.toLowerCase().includes('softwaredistribution'),
+    );
+
+    if (hasSystemPaths) {
+      window.electronAPI.isAdmin().then((admin) => {
+        setState({
+          phase: 'confirming',
+          items,
+          totalBytes,
+          riskBreakdown,
+          progress: null,
+          result: null,
+          isAdmin: admin,
+        });
+      });
+    } else {
+      setState({
+        phase: 'confirming',
+        items,
+        totalBytes,
+        riskBreakdown,
+        progress: null,
+        result: null,
+        isAdmin: false,
+      });
+    }
   }, [scanners, selectedIds]);
 
   /** User confirmed — start cleaning */
@@ -156,6 +182,7 @@ export function useCleaner() {
       riskBreakdown: { green: 0, yellow: 0, red: 0 },
       progress: null,
       result: null,
+      isAdmin: false,
     });
   }, []);
 
@@ -168,12 +195,14 @@ export function useCleaner() {
       riskBreakdown: { green: 0, yellow: 0, red: 0 },
       progress: null,
       result: null,
+      isAdmin: false,
     });
   }, []);
 
   return {
     ...state,
     defaultAction,
+    quarantinePath,
     requestClean,
     confirmClean,
     cancelClean,

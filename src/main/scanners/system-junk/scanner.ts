@@ -27,6 +27,7 @@ export class SystemJunkScanner extends BaseScanner {
   }
 
   async scan(): Promise<ScanResult[]> {
+    // Note: this.config.paths is not used — this scanner targets fixed well-known locations
     const results: ScanResult[] = [];
     let totalBytes = 0;
 

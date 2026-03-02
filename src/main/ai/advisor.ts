@@ -39,32 +39,42 @@ export class Advisor {
   async analyze(results: ScanResult[]): Promise<AIAdvice | null> {
     if (!this.provider || results.length === 0) return null;
 
-    const response = await this.provider.chat({
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: buildAnalysisPrompt(results) },
-      ],
-      maxTokens: 2048,
-      temperature: 0.3,
-    });
+    try {
+      const response = await this.provider.chat({
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: buildAnalysisPrompt(results) },
+        ],
+        maxTokens: 2048,
+        temperature: 0.3,
+      });
 
-    return parseAdviceResponse(response.content);
+      return parseAdviceResponse(response.content);
+    } catch (err) {
+      console.error('[Advisor] analyze failed:', err);
+      return null;
+    }
   }
 
   /** Explain a single item */
   async explainItem(result: ScanResult): Promise<string | null> {
     if (!this.provider) return null;
 
-    const response = await this.provider.chat({
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: buildExplainItemPrompt(result) },
-      ],
-      maxTokens: 512,
-      temperature: 0.3,
-    });
+    try {
+      const response = await this.provider.chat({
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: buildExplainItemPrompt(result) },
+        ],
+        maxTokens: 512,
+        temperature: 0.3,
+      });
 
-    return response.content;
+      return response.content;
+    } catch (err) {
+      console.error('[Advisor] explainItem failed:', err);
+      return null;
+    }
   }
 
   /** Test the current provider connection */

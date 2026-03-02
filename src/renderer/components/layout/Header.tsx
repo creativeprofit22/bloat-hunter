@@ -34,6 +34,7 @@ interface HeaderProps {
 export function Header({ onClean }: HeaderProps) {
   const activeView = useUIStore((s) => s.activeView);
   const isAnyScanning = useScanStore((s) => s.isAnyScanning());
+  const totalItems = useScanStore((s) => s.getTotalItems());
   const selectedCount = useUIStore((s) => Object.keys(s.selectedIds).length);
 
   // Get overall progress (average of all scanning scanners)
@@ -94,6 +95,17 @@ export function Header({ onClean }: HeaderProps) {
           onClick={onClean}
         >
           Clean ({selectedCount})
+        </button>
+
+        <button
+          className="header-btn header-btn--clear"
+          disabled={isAnyScanning || totalItems === 0}
+          onClick={() => {
+            useScanStore.getState().resetAll();
+            useUIStore.getState().clearSelection();
+          }}
+        >
+          Clear All
         </button>
       </div>
 

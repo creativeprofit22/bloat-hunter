@@ -4,6 +4,8 @@ import { useSettingsStore } from '../../store/settings-store';
 import type { AIAdvice, ScanResult } from '../../../main/scanners/types';
 import { RiskExplanation } from './RiskExplanation';
 
+// TODO: Wire up window.electronAPI.aiExplainItem() for per-item AI explanations
+
 type AdviceStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export function AdvisorPanel() {
@@ -30,7 +32,6 @@ export function AdvisorPanel() {
       const settings = useSettingsStore.getState();
       await window.electronAPI.aiConfigure({
         type: settings.aiProvider,
-        apiKey: '', // API key is managed on the main process side via secure storage
         baseUrl: settings.aiBaseUrl,
         model: settings.aiModel,
       });

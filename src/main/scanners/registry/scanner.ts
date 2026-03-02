@@ -37,6 +37,8 @@ export class RegistryScanner extends BaseScanner {
   }
 
   async scan(): Promise<ScanResult[]> {
+    // Note: this.config.paths is not used — this scanner targets fixed well-known locations
+
     // Skip entirely on non-Windows platforms
     if (process.platform !== 'win32') {
       this.updateProgress({ percent: 100, phase: 'Skipped (non-Windows)' });

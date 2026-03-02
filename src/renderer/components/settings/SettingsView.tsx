@@ -37,7 +37,9 @@ export function SettingsView() {
 
   // Persist changes to main process
   const persist = useCallback((partial: Record<string, unknown>) => {
-    window.electronAPI.saveSettings(partial);
+    window.electronAPI.saveSettings(partial).catch((err: unknown) => {
+      console.error('Failed to save settings:', err);
+    });
   }, []);
 
   if (!loaded) {

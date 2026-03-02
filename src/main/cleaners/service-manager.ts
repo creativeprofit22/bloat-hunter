@@ -28,7 +28,7 @@ export async function isAdmin(): Promise<boolean> {
  * Stop a Windows service. Requires admin privileges.
  * Returns true if the service was stopped, false if it was already stopped.
  */
-export async function stopService(serviceName: string): Promise<boolean> {
+async function stopService(serviceName: string): Promise<boolean> {
   if (process.platform !== 'win32') return false;
   try {
     await execAsync(`net stop "${serviceName}"`, { timeout: 30000 });
@@ -46,7 +46,7 @@ export async function stopService(serviceName: string): Promise<boolean> {
 /**
  * Start a Windows service. Requires admin privileges.
  */
-export async function startService(serviceName: string): Promise<boolean> {
+async function startService(serviceName: string): Promise<boolean> {
   if (process.platform !== 'win32') return false;
   try {
     await execAsync(`net start "${serviceName}"`, { timeout: 30000 });
@@ -65,7 +65,7 @@ export async function startService(serviceName: string): Promise<boolean> {
  * Check if a file path requires stopping a Windows service before cleaning.
  * Returns the service names that should be stopped, or empty array if none.
  */
-export function getBlockingServices(filePath: string): string[] {
+function getBlockingServices(filePath: string): string[] {
   const normalized = filePath.replace(/\\/g, '/').toLowerCase();
   const services: string[] = [];
 
