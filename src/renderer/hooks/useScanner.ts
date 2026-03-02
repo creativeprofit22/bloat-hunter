@@ -40,20 +40,24 @@ export function useScanner() {
     const api = window.electronAPI;
 
     const unsubProgress = api.onScanProgress((data) => {
+      if (typeof data !== 'object' || data === null) return;
       updateProgress(data as ScanProgress);
     });
 
     const unsubResult = api.onScanResult((data) => {
+      if (typeof data !== 'object' || data === null || !('scannerType' in data)) return;
       const payload = data as ScanResultPayload;
       setResults(payload.scannerType, payload.results);
     });
 
     const unsubError = api.onScanError((data) => {
+      if (typeof data !== 'object' || data === null || !('scannerType' in data)) return;
       const payload = data as ScanErrorPayload;
       setError(payload.scannerType, payload.error);
     });
 
     const unsubCancelled = api.onScanCancelled((data) => {
+      if (typeof data !== 'object' || data === null || !('scannerType' in data)) return;
       const payload = data as ScanCancelledPayload;
       setCancelled(payload.scannerType);
     });
@@ -66,24 +70,29 @@ export function useScanner() {
     };
   }, [updateProgress, setResults, setError, setCancelled]);
 
-  const settingsStore = useSettingsStore();
+  const scanPaths = useSettingsStore((s) => s.scanPaths);
+  const exclusions = useSettingsStore((s) => s.exclusions);
+  const maxDepth = useSettingsStore((s) => s.maxDepth);
+  const minSize = useSettingsStore((s) => s.minSize);
+  const staleMonths = useSettingsStore((s) => s.staleMonths);
+  const topN = useSettingsStore((s) => s.topN);
 
   /** Start a scan for the given scanner type */
   const startScan = useCallback(
     (scannerType: ScannerType) => {
       const config: ScannerConfig = {
-        paths: settingsStore.scanPaths,
-        exclusions: settingsStore.exclusions,
-        maxDepth: settingsStore.maxDepth,
-        minSize: settingsStore.minSize > 0 ? settingsStore.minSize : undefined,
-        staleMonths: settingsStore.staleMonths,
-        topN: settingsStore.topN,
+        paths: scanPaths,
+        exclusions,
+        maxDepth,
+        minSize: minSize > 0 ? minSize : undefined,
+        staleMonths,
+        topN,
       };
 
       markStarted(scannerType);
       window.electronAPI.startScan(scannerType, config);
     },
-    [markStarted, settingsStore],
+    [markStarted, scanPaths, exclusions, maxDepth, minSize, staleMonths, topN],
   );
 
   /** Cancel a running scan */

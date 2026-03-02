@@ -97,8 +97,9 @@ export function usePreview() {
 
   /** For compare mode: get the two selected results (when exactly 2 selected in same group) */
   const compareResults = useCallback((): [ScanResult, ScanResult] | null => {
-    if (selectedIds.size !== 2) return null;
-    const ids = Array.from(selectedIds);
+    const keys = Object.keys(selectedIds);
+    if (keys.length !== 2) return null;
+    const ids = keys;
     const a = findResult(ids[0]);
     const b = findResult(ids[1]);
     if (!a || !b) return null;
@@ -120,7 +121,7 @@ export function usePreview() {
     setThumbnail(null);
     try {
       const result = await window.electronAPI.generateThumbnail(filePath, 280);
-      if (result) {
+      if (result && typeof result === 'object' && 'data' in result) {
         const thumbData = result as ThumbnailData;
         thumbnailCache.current.set(filePath, thumbData);
         setThumbnail(thumbData);

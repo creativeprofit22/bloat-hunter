@@ -12,7 +12,7 @@ function formatBytes(bytes: number): string {
 export function StatusBar() {
   const totalItems = useScanStore((s) => s.getTotalItems());
   const totalBytes = useScanStore((s) => s.getTotalBytes());
-  const selectedCount = useUIStore((s) => s.selectedIds.size);
+  const selectedCount = useUIStore((s) => Object.keys(s.selectedIds).length);
   const isAnyScanning = useScanStore((s) => s.isAnyScanning());
 
   return (

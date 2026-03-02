@@ -58,6 +58,7 @@ export function useCleaner() {
   useEffect(() => {
     const api = window.electronAPI;
     const unsub = api.onCleanProgress((data) => {
+      if (typeof data !== 'object' || data === null) return;
       setState((prev) => ({
         ...prev,
         progress: data as CleanProgressInfo,
@@ -77,7 +78,7 @@ export function useCleaner() {
     }
 
     // Filter to only selected items
-    const selectedResults = allResults.filter((r) => selectedIds.has(r.id));
+    const selectedResults = allResults.filter((r) => r.id in selectedIds);
     if (selectedResults.length === 0) return;
 
     const items = selectedResults.map(scanResultToCleanable);

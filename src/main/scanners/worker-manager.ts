@@ -71,14 +71,14 @@ export class WorkerManager {
     worker.on('message', (msg: WorkerMessage) => {
       switch (msg.type) {
         case 'progress':
-          callbacks.onProgress(msg.data as ScanProgress);
+          callbacks.onProgress(msg.data);
           break;
         case 'result':
-          callbacks.onResult(scannerType, msg.data as ScanResult[]);
+          callbacks.onResult(scannerType, msg.data);
           this.workers.delete(scannerType);
           break;
         case 'error':
-          callbacks.onError(scannerType, msg.data as string);
+          callbacks.onError(scannerType, msg.data);
           this.workers.delete(scannerType);
           break;
         case 'cancelled':

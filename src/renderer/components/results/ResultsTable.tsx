@@ -251,7 +251,7 @@ export function ResultsTable({ results }: ResultsTableProps) {
               >
                 <FileRow
                   result={result}
-                  selected={selectedIds.has(result.id)}
+                  selected={result.id in selectedIds}
                   onToggle={toggleItem}
                   onContextMenu={handleContextMenu}
                 />

@@ -227,7 +227,8 @@ export interface AIRecommendation {
 
 // ── IPC Message Types ────────────────────────────────────────────────
 
-export interface WorkerMessage {
-  type: 'progress' | 'result' | 'error' | 'cancelled';
-  data: ScanProgress | ScanResult[] | string;
-}
+export type WorkerMessage =
+  | { type: 'progress'; data: ScanProgress }
+  | { type: 'result'; data: ScanResult[] }
+  | { type: 'error'; data: string }
+  | { type: 'cancelled'; data: string };

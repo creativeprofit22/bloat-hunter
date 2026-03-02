@@ -63,7 +63,7 @@ async function hashFileXXHash(filePath: string, xx: XXHashAPI): Promise<string> 
     hasher.update(chunk as Buffer);
   }
 
-  return hasher.digest().toString(16);
+  return hasher.digest().toString(16).padStart(16, '0');
 }
 
 async function hashFileXXHashPartial(
@@ -78,7 +78,7 @@ async function hashFileXXHashPartial(
     hasher.update(chunk as Buffer);
   }
 
-  return hasher.digest().toString(16);
+  return hasher.digest().toString(16).padStart(16, '0');
 }
 
 // ── crypto SHA-256 fallback ──────────────────────────────────────────

@@ -34,7 +34,7 @@ interface HeaderProps {
 export function Header({ onClean }: HeaderProps) {
   const activeView = useUIStore((s) => s.activeView);
   const isAnyScanning = useScanStore((s) => s.isAnyScanning());
-  const selectedCount = useUIStore((s) => s.selectedIds.size);
+  const selectedCount = useUIStore((s) => Object.keys(s.selectedIds).length);
 
   // Get overall progress (average of all scanning scanners)
   const scanners = useScanStore((s) => s.scanners);

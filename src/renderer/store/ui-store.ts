@@ -3,6 +3,9 @@ import type { ScannerType } from '../../main/scanners/types';
 
 export type ActiveView = 'dashboard' | 'settings' | ScannerType;
 
+/** Plain object map — serializable and shallow-equal safe for Zustand v5 */
+export type SelectionMap = Record<string, true>;
+
 interface UIStore {
   /** Currently active view in the main content area */
   activeView: ActiveView;
@@ -13,8 +16,8 @@ interface UIStore {
   /** Whether the preview panel is visible */
   previewVisible: boolean;
 
-  /** Set of selected result item IDs */
-  selectedIds: Set<string>;
+  /** Selected result item IDs */
+  selectedIds: SelectionMap;
 
   /** Set active view */
   setActiveView: (view: ActiveView) => void;
@@ -48,7 +51,7 @@ export const useUIStore = create<UIStore>((set) => ({
   activeView: 'dashboard',
   sidebarCollapsed: false,
   previewVisible: false,
-  selectedIds: new Set(),
+  selectedIds: {},
 
   setActiveView: (view) => set({ activeView: view }),
 
@@ -57,38 +60,36 @@ export const useUIStore = create<UIStore>((set) => ({
   togglePreview: () => set((state) => ({ previewVisible: !state.previewVisible })),
 
   selectItem: (id) =>
-    set((state) => {
-      const next = new Set(state.selectedIds);
-      next.add(id);
-      return { selectedIds: next };
-    }),
+    set((state) => ({
+      selectedIds: { ...state.selectedIds, [id]: true },
+    })),
 
   deselectItem: (id) =>
     set((state) => {
-      const next = new Set(state.selectedIds);
-      next.delete(id);
-      return { selectedIds: next };
+      const { [id]: _, ...rest } = state.selectedIds;
+      return { selectedIds: rest };
     }),
 
   toggleItem: (id) =>
     set((state) => {
-      const next = new Set(state.selectedIds);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
+      if (id in state.selectedIds) {
+        const { [id]: _, ...rest } = state.selectedIds;
+        return { selectedIds: rest };
       }
-      return { selectedIds: next };
+      return { selectedIds: { ...state.selectedIds, [id]: true } };
     }),
 
   selectItems: (ids) =>
     set((state) => {
-      const next = new Set(state.selectedIds);
-      for (const id of ids) next.add(id);
+      const next = { ...state.selectedIds };
+      for (const id of ids) next[id] = true;
       return { selectedIds: next };
     }),
 
-  clearSelection: () => set({ selectedIds: new Set() }),
+  clearSelection: () => set({ selectedIds: {} }),
 
-  selectAll: (ids) => set({ selectedIds: new Set(ids) }),
+  selectAll: (ids) =>
+    set({
+      selectedIds: Object.fromEntries(ids.map((id) => [id, true as const])),
+    }),
 }));

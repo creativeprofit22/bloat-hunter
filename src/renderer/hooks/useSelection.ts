@@ -27,6 +27,7 @@ export function useSelection(results: ScanResult[]) {
   const clearSelection = useUIStore((s) => s.clearSelection);
   const selectItems = useUIStore((s) => s.selectItems);
   const deselectItem = useUIStore((s) => s.deselectItem);
+  const selectedCount = Object.keys(selectedIds).length;
 
   /** All result IDs */
   const allIds = useMemo(() => results.map((r) => r.id), [results]);
@@ -55,7 +56,7 @@ export function useSelection(results: ScanResult[]) {
     (groupId: string) => {
       const groupItems = results.filter((r) => r.groupId === groupId);
       const groupIds = groupItems.map((r) => r.id);
-      const allSelected = groupIds.every((id) => selectedIds.has(id));
+      const allSelected = groupIds.every((id) => id in selectedIds);
       if (allSelected) {
         for (const id of groupIds) {
           deselectItem(id);
@@ -71,7 +72,7 @@ export function useSelection(results: ScanResult[]) {
   const isGroupSelected = useCallback(
     (groupId: string) => {
       const groupItems = results.filter((r) => r.groupId === groupId);
-      return groupItems.length > 0 && groupItems.every((r) => selectedIds.has(r.id));
+      return groupItems.length > 0 && groupItems.every((r) => r.id in selectedIds);
     },
     [results, selectedIds],
   );
@@ -80,8 +81,8 @@ export function useSelection(results: ScanResult[]) {
   const isGroupIndeterminate = useCallback(
     (groupId: string) => {
       const groupItems = results.filter((r) => r.groupId === groupId);
-      const someSelected = groupItems.some((r) => selectedIds.has(r.id));
-      const allSelected = groupItems.every((r) => selectedIds.has(r.id));
+      const someSelected = groupItems.some((r) => r.id in selectedIds);
+      const allSelected = groupItems.every((r) => r.id in selectedIds);
       return someSelected && !allSelected;
     },
     [results, selectedIds],
@@ -195,7 +196,7 @@ export function useSelection(results: ScanResult[]) {
     isGroupSelected,
     isGroupIndeterminate,
     smartSelect,
-    selectedCount: selectedIds.size,
+    selectedCount,
     totalCount: results.length,
     hasDuplicateGroups: duplicateGroups.length > 0,
   };

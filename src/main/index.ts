@@ -1,6 +1,20 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import path from 'path';
 import { registerIpcHandlers } from './ipc';
+
+// Last-resort error handlers — prevent silent main-process crashes.
+// Guard against duplicate registration when the module is re-imported in tests.
+if (!process.listeners('uncaughtException').some((fn) => fn.name === '__bloatHunterUncaught')) {
+  process.on('uncaughtException', function __bloatHunterUncaught(error) {
+    console.error('Uncaught Exception:', error);
+    dialog.showErrorBox('Unexpected Error', error.message ?? String(error));
+  });
+}
+if (!process.listeners('unhandledRejection').some((fn) => fn.name === '__bloatHunterUnhandled')) {
+  process.on('unhandledRejection', function __bloatHunterUnhandled(reason) {
+    console.error('Unhandled Rejection:', reason);
+  });
+}
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 
@@ -48,7 +62,7 @@ function createWindow(): void {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+
       spellcheck: false,
     },
   });

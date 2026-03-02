@@ -9,6 +9,8 @@ import type { ScannerConfig, ScanResult, ScanRule } from '../types';
 
 import commonLeftovers from './rules/common-leftovers.json';
 
+const leftoverRules = commonLeftovers as ScanRule[];
+
 const execAsync = promisify(exec);
 
 /** Well-known Windows folders that should never be flagged as orphans. */
@@ -261,9 +263,7 @@ export class AppLeftoversScanner extends BaseScanner {
     const results: ScanResult[] = [];
 
     // Use the shortcut rules from common-leftovers.json
-    const shortcutRule = (commonLeftovers as ScanRule[]).find(
-      (r) => r.id === 'app-leftovers.startmenu-broken',
-    );
+    const shortcutRule = leftoverRules.find((r) => r.id === 'app-leftovers.startmenu-broken');
     if (!shortcutRule) return results;
 
     for await (const match of executeRule(shortcutRule, () => this.cancelled)) {
@@ -313,9 +313,7 @@ export class AppLeftoversScanner extends BaseScanner {
   private async findLeftoverInstallers(): Promise<ScanResult[]> {
     const results: ScanResult[] = [];
 
-    const installerRule = (commonLeftovers as ScanRule[]).find(
-      (r) => r.id === 'app-leftovers.temp-installers',
-    );
+    const installerRule = leftoverRules.find((r) => r.id === 'app-leftovers.temp-installers');
     if (!installerRule) return results;
 
     for await (const match of executeRule(installerRule, () => this.cancelled)) {

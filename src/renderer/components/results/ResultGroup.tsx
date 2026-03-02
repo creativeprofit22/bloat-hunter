@@ -13,7 +13,7 @@ function formatBytes(bytes: number): string {
 interface ResultGroupProps {
   groupId: string;
   items: ScanResult[];
-  selectedIds: Set<string>;
+  selectedIds: Record<string, true>;
   isGroupSelected: boolean;
   isGroupIndeterminate: boolean;
   onToggleItem: (id: string) => void;
@@ -66,7 +66,7 @@ export function ResultGroup({
             <FileRow
               key={item.id}
               result={item}
-              selected={selectedIds.has(item.id)}
+              selected={item.id in selectedIds}
               onToggle={onToggleItem}
               onContextMenu={onContextMenu}
               indented

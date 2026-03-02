@@ -91,3 +91,20 @@ Fix ALL errors and warnings before continuing. No exceptions.
 - `contextIsolation: true`, `nodeIntegration: false`
 - Strict CSP in production (dev suppresses for Vite HMR)
 - API keys stored via Electron safeStorage (encrypted at rest)
+
+## Last Session (2026-03-01)
+- Ran full 8-agent carrot verification (framework, deps, TS patterns, config, security, testing, data handling, error handling)
+- Fixed HIGH: Added `process.on('uncaughtException/unhandledRejection')` in `src/main/index.ts` with dialog + duplicate-registration guard
+- Fixed HIGH: Replaced `Set<string>` → `Record<string, true>` in `ui-store.ts` + all 8 consumers + tests (Zustand v5 infinite re-render risk)
+- Typecheck + 115/115 tests pass clean
+- Stopped at: High severity done, medium/low findings remain
+
+## Next Steps
+1. Fix MEDIUM: Remove `sandbox: false` from `src/main/index.ts:51` (preload only needs contextBridge/ipcRenderer)
+2. Fix MEDIUM: Add React ErrorBoundary wrapping `<App />` in `src/renderer/main.tsx` + `createRoot` error callbacks
+3. Fix MEDIUM: Convert `WorkerMessage` to discriminated union in `src/main/scanners/types.ts` → remove 4 `as` casts in `worker-manager.ts`
+4. Fix MEDIUM: Use per-field selectors in `src/renderer/hooks/useScanner.ts:69` instead of full store subscription
+5. Fix MEDIUM: Replace `as ScanRule[]` with `satisfies` on JSON imports in scanner files
+6. Fix LOW: Update `eslint.config.mjs` to use `reactHooks.configs.flat.recommended`
+7. Fix LOW: Add type guards at IPC boundary in `useScanner.ts`, `useCleaner.ts`, `usePreview.ts`
+8. Fix LOW: Zero-pad xxhash digest in `src/main/scanners/duplicates/hasher.ts`
