@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
-import { exec } from 'child_process';
-import { readdir, stat, readlink } from 'fs/promises';
+import { exec, execFile } from 'child_process';
+import { readdir, stat } from 'fs/promises';
 import { basename, join } from 'path';
 import { promisify } from 'util';
 import { BaseScanner } from '../base-scanner';
@@ -12,6 +12,7 @@ import commonLeftovers from './rules/common-leftovers.json';
 const leftoverRules = commonLeftovers as ScanRule[];
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /** Well-known Windows folders that should never be flagged as orphans. */
 const SYSTEM_FOLDERS = new Set([
@@ -94,15 +95,18 @@ function isInstalledApp(folderName: string, installedPrograms: Set<string>): boo
 /**
  * Resolve a .lnk shortcut target on Windows using PowerShell.
  * Returns the target path or null if it cannot be resolved.
+ *
+ * Uses execFile (no shell) to prevent command injection via crafted filenames.
+ * PowerShell single-quoted strings treat everything as literal except '' (escaped quote).
  */
 async function resolveShortcutTarget(lnkPath: string): Promise<string | null> {
   try {
-    // Use PowerShell COM object to read .lnk target
     const escaped = lnkPath.replace(/'/g, "''");
-    const { stdout } = await execAsync(
-      `powershell -NoProfile -Command "(New-Object -ComObject WScript.Shell).CreateShortcut('${escaped}').TargetPath"`,
-      { windowsHide: true, timeout: 5000 },
-    );
+    const script = `(New-Object -ComObject WScript.Shell).CreateShortcut('${escaped}').TargetPath`;
+    const { stdout } = await execFileAsync('powershell', ['-NoProfile', '-Command', script], {
+      windowsHide: true,
+      timeout: 5000,
+    });
     const target = stdout.trim();
     return target || null;
   } catch {
@@ -190,6 +194,7 @@ export class AppLeftoversScanner extends BaseScanner {
    */
   private async findOrphanFolders(installedPrograms: Set<string>): Promise<ScanResult[]> {
     const results: ScanResult[] = [];
+    let totalOrphanBytes = 0;
 
     const appDataDirs = [
       resolveEnvVars('%APPDATA%'),
@@ -245,10 +250,11 @@ export class AppLeftoversScanner extends BaseScanner {
           isDirectory: true,
         });
 
+        totalOrphanBytes += dirSize;
         this.updateProgress({
           currentPath: folderPath,
           itemsFound: results.length,
-          bytesFound: results.reduce((sum, r) => sum + r.size, 0),
+          bytesFound: totalOrphanBytes,
         });
       }
     }
@@ -282,13 +288,7 @@ export class AppLeftoversScanner extends BaseScanner {
         targetExists = false;
       }
 
-      // Also try readlink for symlink-style shortcuts
       if (targetExists) {
-        try {
-          await readlink(match.path);
-        } catch {
-          // Not a symlink, that's fine
-        }
         continue; // Target exists — shortcut is valid
       }
 

@@ -3,7 +3,7 @@ import { app } from 'electron';
 import path from 'path';
 import type { ScannerType, ScannerConfig, ScanProgress, ScanResult, WorkerMessage } from './types';
 
-export interface WorkerCallbacks {
+interface WorkerCallbacks {
   onProgress: (progress: ScanProgress) => void;
   onResult: (scannerType: ScannerType, results: ScanResult[]) => void;
   onError: (scannerType: ScannerType, error: string) => void;

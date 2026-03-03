@@ -30,11 +30,6 @@ class MinHeap {
     return this.data.length;
   }
 
-  /** Smallest entry in the heap (root). */
-  peekMin(): HeapEntry | undefined {
-    return this.data[0];
-  }
-
   /** Push an entry, evicting the smallest if over capacity. */
   push(entry: HeapEntry): void {
     if (this.data.length < this.capacity) {

@@ -91,7 +91,7 @@ async function processItems(
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
 
-    // Gap 14: Skip registry key paths — they cannot be handled by filesystem operations
+    // Skip registry key paths — they cannot be handled by filesystem operations
     if (item.path.startsWith('HKEY_')) {
       result.failedCount++;
       result.errors.push({
@@ -149,7 +149,7 @@ async function processItems(
       result.errors.push(error);
     }
 
-    // Gap 13: Progress fires AFTER item is processed so counts reflect completed work
+    // Progress fires AFTER item is processed so counts reflect completed work
     onProgress?.({
       current: i + 1,
       total: items.length,

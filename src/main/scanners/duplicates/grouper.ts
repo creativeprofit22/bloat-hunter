@@ -8,14 +8,14 @@ export interface FileInfo {
 }
 
 /** A group of confirmed duplicate files sharing the same content hash. */
-export interface DuplicateGroup {
+interface DuplicateGroup {
   hash: string;
   size: number;
   files: FileInfo[];
 }
 
 /** Progress callback for reporting pipeline status. */
-export interface GrouperProgress {
+interface GrouperProgress {
   phase: 'prehash' | 'full-hash';
   current: number;
   total: number;

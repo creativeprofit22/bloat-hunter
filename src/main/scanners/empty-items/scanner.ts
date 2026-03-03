@@ -99,9 +99,11 @@ export class EmptyItemsScanner extends BaseScanner {
   }
 
   /**
-   * Recursively find empty directories using a bottom-up approach.
-   * A directory is considered empty if it contains no files and all
-   * of its subdirectories are also empty.
+   * Recursively find empty directories — only reports leaf-level empty dirs
+   * (directories with zero entries). Parent directories that contain only
+   * empty subdirs are NOT reported; they will surface on the next scan
+   * after their children are deleted. This prevents rm({ recursive: true })
+   * from silently destroying files written between scan and clean.
    */
   private async findEmptyDirs(
     dir: string,
@@ -131,42 +133,16 @@ export class EmptyItemsScanner extends BaseScanner {
       return [{ path: dir, modified }];
     }
 
-    // Check subdirectories recursively
+    // Recurse into all subdirectories to find empty leaves
     const emptyDirs: { path: string; modified: number }[] = [];
-    let hasFiles = false;
-    let allSubdirsEmpty = true;
 
     for (const entry of entries) {
       if (this.cancelled) return emptyDirs;
 
-      if (entry.isFile() || entry.isSymbolicLink()) {
-        hasFiles = true;
-        break;
-      }
-
       if (entry.isDirectory()) {
         const subEmpty = await this.findEmptyDirs(join(dir, entry.name), maxDepth, depth + 1);
-
-        if (subEmpty.length === 0) {
-          // This subdirectory is NOT empty (or exceeds depth)
-          allSubdirsEmpty = false;
-        } else {
-          // Collect empty subdirectories
-          emptyDirs.push(...subEmpty);
-        }
+        emptyDirs.push(...subEmpty);
       }
-    }
-
-    // If no files and all subdirectories are empty, this dir is also empty
-    if (!hasFiles && allSubdirsEmpty && entries.length > 0) {
-      let modified = 0;
-      try {
-        const s = await stat(dir);
-        modified = s.mtimeMs;
-      } catch {
-        // Can't stat — use 0
-      }
-      emptyDirs.push({ path: dir, modified });
     }
 
     return emptyDirs;

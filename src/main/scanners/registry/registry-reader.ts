@@ -1,10 +1,10 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /** A single registry value entry. */
-export interface RegistryValue {
+interface RegistryValue {
   /** Value name (empty string = default value) */
   name: string;
   /** Registry value type (REG_SZ, REG_DWORD, REG_BINARY, etc.) */
@@ -14,7 +14,7 @@ export interface RegistryValue {
 }
 
 /** Information about a single registry key. */
-export interface RegistryKeyInfo {
+interface RegistryKeyInfo {
   /** Full registry key path */
   keyPath: string;
   /** Values contained in this key */
@@ -43,7 +43,7 @@ export async function queryKey(keyPath: string): Promise<RegistryKeyInfo | null>
   if (!IS_WINDOWS) return null;
 
   try {
-    const { stdout } = await execAsync(`reg query "${keyPath}"`, {
+    const { stdout } = await execFileAsync('reg', ['query', keyPath], {
       windowsHide: true,
       timeout: 10000,
     });
@@ -63,7 +63,7 @@ export async function enumSubKeys(keyPath: string): Promise<string[]> {
   if (!IS_WINDOWS) return [];
 
   try {
-    const { stdout } = await execAsync(`reg query "${keyPath}"`, {
+    const { stdout } = await execFileAsync('reg', ['query', keyPath], {
       windowsHide: true,
       timeout: 10000,
     });
@@ -89,51 +89,19 @@ export async function enumSubKeys(keyPath: string): Promise<string[]> {
 }
 
 /**
- * Count the number of values in a registry key.
- * Returns 0 if the key does not exist.
- */
-export async function countValues(keyPath: string): Promise<number> {
-  const info = await queryKey(keyPath);
-  return info?.values.length ?? 0;
-}
-
-/**
  * Check if a registry key exists.
  */
 export async function keyExists(keyPath: string): Promise<boolean> {
   if (!IS_WINDOWS) return false;
 
   try {
-    await execAsync(`reg query "${keyPath}" /ve`, {
+    await execFileAsync('reg', ['query', keyPath, '/ve'], {
       windowsHide: true,
       timeout: 5000,
     });
     return true;
   } catch {
     return false;
-  }
-}
-
-/**
- * Query a specific value within a registry key.
- * Returns null if the value does not exist.
- */
-export async function queryValue(
-  keyPath: string,
-  valueName: string,
-): Promise<RegistryValue | null> {
-  if (!IS_WINDOWS) return null;
-
-  try {
-    const { stdout } = await execAsync(`reg query "${keyPath}" /v "${valueName}"`, {
-      windowsHide: true,
-      timeout: 5000,
-    });
-
-    const info = parseRegQueryOutput(keyPath, stdout);
-    return info?.values.find((v) => v.name.toLowerCase() === valueName.toLowerCase()) ?? null;
-  } catch {
-    return null;
   }
 }
 

@@ -22,8 +22,3 @@ export function registerScanResults(results: { path: string }[]): void {
 export function isKnownScanResult(filePath: string): boolean {
   return knownPaths.has(normalizeKey(filePath));
 }
-
-/** Clear all registered paths. Called on app restart (naturally) or if needed. */
-export function clearScanResults(): void {
-  knownPaths.clear();
-}

@@ -151,7 +151,6 @@ export function usePreview() {
     compareResults,
     thumbnail,
     thumbnailLoading,
-    loadThumbnail,
     isImageFile,
   };
 }

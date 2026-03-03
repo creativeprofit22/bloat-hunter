@@ -9,6 +9,8 @@ icon: assets/icon.png
 asar: true
 asarUnpack:
   - dist/main/scanner-worker.js
+  - node_modules/sharp/**
+  - node_modules/@img/*/
 win:
   target:
     - nsis
