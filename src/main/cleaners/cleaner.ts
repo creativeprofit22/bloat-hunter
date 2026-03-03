@@ -144,7 +144,7 @@ async function processItems(
       const error: CleanError = {
         path: item.path,
         message: err instanceof Error ? err.message : String(err),
-        code: (err as NodeJS.ErrnoException).code,
+        code: err instanceof Error ? (err as NodeJS.ErrnoException).code : undefined,
       };
       result.errors.push(error);
     }

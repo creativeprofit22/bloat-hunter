@@ -11,6 +11,7 @@ import type {
   AIProviderConfig,
   ScanResult,
 } from './scanners/types';
+import path from 'path';
 import { cleanItems } from './cleaners/cleaner';
 import { isAdmin } from './cleaners/service-manager';
 import { advisor } from './ai/advisor';
@@ -18,6 +19,38 @@ import { loadSettings, updateSettings, type AppSettings } from './settings/store
 import { setApiKey, getApiKey, hasApiKey } from './settings/secure-store';
 
 const MAX_THUMBNAIL_SIZE = 1024;
+
+/** Only these providers may store API keys. Blocks prototype pollution via arbitrary keys. */
+const VALID_API_KEY_PROVIDERS = new Set(['claude', 'openai', 'ollama']);
+
+/** Blocked prefixes for the moveTo destination — prevents moving files into system directories. */
+const BLOCKED_MOVE_PREFIXES = [
+  'C:\\Windows',
+  'C:\\Program Files',
+  'C:\\Program Files (x86)',
+  'C:\\ProgramData',
+].map((p) => p.toLowerCase());
+
+/** Validate the moveTo destination path. Must be absolute, no traversal, outside system dirs. */
+function validateMoveTo(moveTo: string): string {
+  const resolved = path.resolve(moveTo);
+  if (resolved !== path.normalize(moveTo)) {
+    throw new Error('moveTo path contains traversal sequences');
+  }
+  if (!path.isAbsolute(resolved)) {
+    throw new Error('moveTo must be an absolute path');
+  }
+  const lower = resolved.toLowerCase();
+  for (const prefix of BLOCKED_MOVE_PREFIXES) {
+    if (lower.startsWith(prefix)) {
+      throw new Error(`moveTo cannot target system directory: ${resolved}`);
+    }
+  }
+  if (resolved.startsWith('\\\\')) {
+    throw new Error('moveTo cannot target UNC/network paths');
+  }
+  return resolved;
+}
 
 /** Only allow localhost URLs for Ollama baseUrl — block exfiltration via arbitrary endpoints. */
 function validateLocalUrl(url?: string): string | undefined {
@@ -126,6 +159,9 @@ export function registerIpcHandlers(): void {
       action: CleanAction,
       moveTo?: string,
     ) => {
+      // Validate moveTo destination before doing anything else
+      const validatedMoveTo = moveTo && action === 'move' ? validateMoveTo(moveTo) : undefined;
+
       // Only allow cleaning paths that were returned by a prior scan
       const validatedItems = items.filter((item) => isKnownScanResult(item.path));
       if (validatedItems.length === 0) {
@@ -143,11 +179,15 @@ export function registerIpcHandlers(): void {
 
       const sender = event.sender;
 
-      const result = await cleanItems(validatedItems, { action, moveTo }, (progress) => {
-        if (!sender.isDestroyed()) {
-          sender.send('clean:progress', progress);
-        }
-      });
+      const result = await cleanItems(
+        validatedItems,
+        { action, moveTo: validatedMoveTo },
+        (progress) => {
+          if (!sender.isDestroyed()) {
+            sender.send('clean:progress', progress);
+          }
+        },
+      );
 
       return result;
     },
@@ -170,11 +210,15 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'settings:set-api-key',
     (_event: IpcMainInvokeEvent, provider: string, apiKey: string) => {
+      if (!VALID_API_KEY_PROVIDERS.has(provider)) {
+        throw new Error(`Unknown API key provider: ${provider}`);
+      }
       setApiKey(provider, apiKey);
     },
   );
 
   ipcMain.handle('settings:has-api-key', (_event: IpcMainInvokeEvent, provider: string) => {
+    if (!VALID_API_KEY_PROVIDERS.has(provider)) return false;
     return hasApiKey(provider);
   });
 

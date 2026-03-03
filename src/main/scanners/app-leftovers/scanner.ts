@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { exec, execFile } from 'child_process';
+import { execFile } from 'child_process';
 import { readdir, stat } from 'fs/promises';
 import { basename, join } from 'path';
 import { promisify } from 'util';
@@ -11,7 +11,6 @@ import commonLeftovers from './rules/common-leftovers.json';
 
 const leftoverRules = commonLeftovers as ScanRule[];
 
-const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 /** Well-known Windows folders that should never be flagged as orphans. */
@@ -51,7 +50,7 @@ async function getInstalledPrograms(): Promise<Set<string>> {
 
   for (const regPath of regPaths) {
     try {
-      const { stdout } = await execAsync(`reg query "${regPath}" /s /v DisplayName`, {
+      const { stdout } = await execFileAsync('reg', ['query', regPath, '/s', '/v', 'DisplayName'], {
         windowsHide: true,
         timeout: 15000,
       });

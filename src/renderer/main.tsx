@@ -30,11 +30,11 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 }
 
 createRoot(document.getElementById('root')!, {
-  onUncaughtError: (error) => {
-    console.error('Uncaught React error:', error);
+  onUncaughtError: (error, errorInfo) => {
+    console.error('Uncaught React error:', error, errorInfo.componentStack);
   },
-  onCaughtError: (error) => {
-    console.error('Caught React error:', error);
+  onCaughtError: (error, errorInfo) => {
+    console.error('Caught React error:', error, errorInfo.componentStack);
   },
 }).render(
   <StrictMode>

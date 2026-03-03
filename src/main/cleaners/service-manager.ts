@@ -1,7 +1,8 @@
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /** Known Windows services that lock files the app may need to clean */
 const CLEANABLE_SERVICES: Record<string, string[]> = {
@@ -31,7 +32,7 @@ export async function isAdmin(): Promise<boolean> {
 async function stopService(serviceName: string): Promise<boolean> {
   if (process.platform !== 'win32') return false;
   try {
-    await execAsync(`net stop "${serviceName}"`, { timeout: 30000 });
+    await execFileAsync('net', ['stop', serviceName], { timeout: 30000 });
     return true;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -49,7 +50,7 @@ async function stopService(serviceName: string): Promise<boolean> {
 async function startService(serviceName: string): Promise<boolean> {
   if (process.platform !== 'win32') return false;
   try {
-    await execAsync(`net start "${serviceName}"`, { timeout: 30000 });
+    await execFileAsync('net', ['start', serviceName], { timeout: 30000 });
     return true;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

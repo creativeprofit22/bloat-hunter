@@ -11,8 +11,8 @@ if (!process.listeners('uncaughtException').some((fn) => fn.name === '__bloatHun
   });
 }
 if (!process.listeners('unhandledRejection').some((fn) => fn.name === '__bloatHunterUnhandled')) {
-  process.on('unhandledRejection', function __bloatHunterUnhandled(reason) {
-    console.error('Unhandled Rejection:', reason);
+  process.on('unhandledRejection', function __bloatHunterUnhandled(reason, promise) {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   });
 }
 
@@ -62,7 +62,7 @@ function createWindow(): void {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-
+      sandbox: true,
       spellcheck: false,
     },
   });
